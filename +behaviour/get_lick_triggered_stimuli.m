@@ -6,9 +6,9 @@ function [elts, elt] = get_lick_triggered_stimuli(trials, ops)
 
 %%
 
-% trials = trials([trials.keepTrial] & [trials.deviantsOn]);
+trials = trials(logical([trials.keepTrial]) & logical([trials.deviantsOn]));
 
-t_hist=ops.tHistory+.5;
+t_hist=ops.tHistory+.5; % padding for smoothing
 
 elts = nan(0, t_hist*20);
 elt  = nan(0, 1);
@@ -36,7 +36,6 @@ for tr = 1:length(trials)
     if length(pre_fa_tf) < t_hist*20
         missing = round(t_hist*20) - length(pre_fa_tf);
         pre_fa_tf = [nan(missing,1); pre_fa_tf];
-        % pre_fa_tf = [zeros(missing,1); pre_fa_tf];
     end
     elts(end+1, :) = pre_fa_tf';
     elt(end+1, :)  = lick_t;    

@@ -1,8 +1,7 @@
-function [psycho, chrono, ntr] = calculate_psychometric(trials)
+function [psycho, chrono, ntr] = calculate_session_psychometric(trials)
 
-% change_tfs = sort(unique([trials.changeTF]));
 change_tfs = [.25 1 1.5 2 2.5 3 3.75];
-trials = trials([trials.keepTrial] & [trials.deviantsOn]);
+trials = trials([trials.keepTrial]  & logical([trials.deviantsOn]));
 ntr = length(trials);
 
 change = [trials.changeTF];
@@ -33,7 +32,8 @@ for ctf = 1:length(change_tfs)
                      sum(change == change_tf & (hits | miss) & uex);
                  
     chrono(2, ctf) = nanmean(rxn_times(change == change_tf & hits & exp));
-    chrono(3, ctf) = nanmean(rxn_times(change == change_tf & hits & uex));       
+    chrono(3, ctf) = nanmean(rxn_times(change == change_tf & hits & uex));  
+    
 end
 
 

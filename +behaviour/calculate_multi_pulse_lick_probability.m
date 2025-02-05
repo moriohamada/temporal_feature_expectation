@@ -61,9 +61,7 @@ for w = 1:n_win
                 end
                 p_lick_double(w, d, b1, b2) = sum(licked(in_win & in_bin & prev_in_bin)) / ...
                                               sum(in_win & in_bin & prev_in_bin);
-                if ops.logLickP
-                    p_lick_double(w, d, b1, b2) = log(p_lick_double(w, d, b1, b2) + 1e-10);
-                end
+ 
                                           
             end
         end

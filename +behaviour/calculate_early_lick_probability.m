@@ -14,11 +14,6 @@ bin_mids = linspace(prctile(vals,2.5), prctile(vals,97.5), 100);
 bin_size = mean(diff(bin_mids))*5;
 bin_starts = bin_mids-bin_size/2;
 bin_ends   = bin_mids+bin_size/2;
-% bin_starts = linspace(-.08, .08, 50);
-% bin_size   = mean(diff(bin_starts))*5;
-% bin_starts(bin_starts > 1-bin_size) = [];
-% bin_ends   = bin_starts + bin_size;
-% bin_mids   = mean([bin_starts; bin_ends], 1);
 
 bin_starts(1) = -inf;
 bin_ends(end) = inf;
@@ -51,19 +46,12 @@ for w = 1:size(wins, 1)
     end
     
     if ops.normLickP
-%         lick_p(:,w) = lick_p(:,w) - lick_p(zero_bin_id,w);
-        lick_p(:,w) = (lick_p(:,w) - min(lick_p(range_bins,w)));% / min(lick_p(range_bins,w));% lick_p(zero_bin_id,w);
-%         lick_p(:,w) = lick_p(:,w)/max(lick_p(range_wins, w))*5e-3;
-    end
-    
-    if ops.logLickP
-        lick_p(:,w) = log(lick_p(:,w) + 1e-10);
+        lick_p(:,w) = (lick_p(:,w) - min(lick_p(range_bins,w)));
     end
     
 end
 
-bin_mids = bin_mids / max(abs(vals));% prctile(abs(vals), 90);
-
+bin_mids = bin_mids / max(abs(vals)); 
 
 
 end
