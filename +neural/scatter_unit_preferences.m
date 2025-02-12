@@ -1,34 +1,87 @@
-function f = plot_pref_indexes(indexes, ops)
+function scatter_unit_preferences(avg_resps, indexes, ops)
+% Create scatter plots showing relationships between:
+% 1) TF prefs (expF vs expS)
+% 2) Pre-lick mod (expF vs expS)
+% 3) TF pref vs pre-lick mod
+% 
+% --------------------------------------------------------------------------------------------------
 
-indexes_to_plot = {'timeBL', 'tf'};
-cols = {{ops.colors.E, ops.colors.L}, {ops.colors.S, ops.colors.F}};
-sig_tf = sign(indexes.tfExpF)==sign(indexes.tfExpS) & (indexes.tfExpF_p<sqrt(.05) & indexes.tfExpS_p<sqrt(.05));
-sig_time = sign(indexes.timeBL)==sign(indexes.timePreTF) & (indexes.timeBL_p<sqrt(.05) & indexes.timePreTF_p<sqrt(.05));
-%%
-f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .2*length(indexes_to_plot)/3 .15]); hold on;
+%% select only good units
+multi = utils.get_multi(avg_resps, indexes) ;
 
-for ii = 1:length(indexes_to_plot)
+rois = utils.group_rois;
+
+[tf_sensitive, tf_pref] = utils.get_tf_pref(indexes);
+
+tf_sensitive = ((indexes.tf_z_peakF)>1.96 | (indexes.tf_z_peakS)>1.96) & ...
+                indexes.tf_short_p<.05 & ...
+                indexes.tf_short~=0 & ~isnan(indexes.tf_short) & sign(indexes.tf_short)==sign(indexes.tf_z_peakD);
+
+%% Scatter 
+
+clrs  = [.6 .6 .6; ops.colors.S_pref; ops.colors.F_pref]; % non, slow, fast
+alphs = [.3, .6, .6]; 
+szs   = [20, 30, 30];
+
+for r = 1:height(rois)
     
-    subplot(1,length(indexes_to_plot), ii)
-    hold on
-    ind = indexes_to_plot{ii};
-    idx = table2array(indexes(:,ind));
-    histogram(idx, [-.6:.05:.6], 'EdgeAlpha',0,'FaceColor', [.5 .5 .5]);
+    in_roi = utils.get_units_in_area(indexes.loc, rois{r,2}) & ~multi;
     
-    % plot sig
-    if ii==1, sig = sig_time; elseif ii==2, sig=sig_tf; end
-    sig_low  = sig & idx<0;
-    sig_high = sig & idx>0;
-%     sig_low  = indexes.(strcat(ind, '_p')) < 0.05 & idx<0;
-%     sig_high = indexes.(strcat(ind, '_p')) < 0.05 & idx>0;
-    histogram(idx(sig_low), [-.6:.05:.6], 'EdgeAlpha',0,'FaceColor', cols{ii}{1});
-    histogram(idx(sig_high), [-.6:.05:.6], 'EdgeAlpha',0,'FaceColor', cols{ii}{2});
+    fast    = tf_pref>0 & in_roi & tf_sensitive;
+    slow    = tf_pref<0 &  in_roi & tf_sensitive;
+    nontf   = ~tf_sensitive & in_roi;
+        
+    % label preferences: -1, 0, 1
+    prefs = zeros(size(fast));
+    prefs(fast)  = 3;
+    prefs(slow)  = 2;
+    prefs(nontf) = 1;
     
-    n_sig = sum(sig_high + sig_low);
-    title(sprintf('%d/%d (%.1f%s)', n_sig, length(idx), n_sig/length(idx)*100, '%'), 'FontSize', 8, 'FontWeight', 'normal')
-    xlabel(ind);
-    set(gca, 'box', 'off')
-end
+    f=figure('Units', 'normalized', 'OuterPosition', [.1 .1 .11 .07]);
 
-
+    % loop through pref types
+    for pref_i = 1:3
+        
+        
+        %% TF expF vs expS
+        
+        subplot(1,3,1); hold on;
+        sel = prefs == pref_i & ...
+              (indexes.tfExpF_short_p<.05 & indexes.tfExpS_short_p<.05); 
+        scatter(indexes{sel, 'tfExpF_short'}, indexes{sel, 'tfExpS_short'}, szs(pref_i), ...
+                'MarkerFaceColor', clrs(pref_i,:), 'MarkerFaceAlpha', alphs(pref_i), ...
+                'MarkerEdgeAlpha', 0)
+        set(gca, 'XAxisLocation', 'origin', 'YAxisLocation', 'origin')
+        xlim([-.5 .5]); ylim([-.5 .5])
+        plot([-.5 .5], [-.5 .5], 'k', 'linewidth', .5)
+        
+        %% Prelick expF vs expS
+        subplot(1,3,2); hold on;
+        
+        sel = prefs == pref_i & ...
+              (indexes.prelickExpF_p < .01 & indexes.prelickExpS_p < .01);
+        scatter(indexes{sel, 'prelickExpF'}, indexes{sel, 'prelickExpS'}, szs(pref_i), ...
+                'MarkerFaceColor', clrs(pref_i,:), 'MarkerFaceAlpha', alphs(pref_i), ...
+                'MarkerEdgeAlpha', 0)
+        set(gca, 'XAxisLocation', 'origin', 'YAxisLocation', 'origin')
+        xlim([-.5 .5]); ylim([-.5 .5])
+        plot([-.5 .5], [-.5 .5], 'k', 'linewidth', .5)
+        
+        %% TF vs prelick
+        
+        subplot(1,3,3); hold on;
+        
+        sel = prefs == pref_i  &  indexes.prelick_p < .01;
+        scatter(indexes{sel, 'tf_short'}, indexes{sel, 'prelick'}, szs(pref_i), ...
+                'MarkerFaceColor', clrs(pref_i,:), 'MarkerFaceAlpha', alphs(pref_i), ...
+                'MarkerEdgeAlpha', 0)
+        set(gca, 'XAxisLocation', 'origin', 'YAxisLocation', 'origin')
+        xlim([-.5 .5]); ylim([-.5 .5])
+         
+        
+        
+    end
+    if ops.saveFigs
+        save_figures_multi_format(f, fullfile(ops.saveDir, 'neural', ['unit_preference_scatters_', rois{r,1}]), {'fig', 'svg', 'png', 'pdf'})
+    end
 end

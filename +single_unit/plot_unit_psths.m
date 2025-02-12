@@ -1,4 +1,4 @@
-function f = plot_single_unit_psths(ev_times, st, flip_time, ops)
+function f = plot_unit_psths(ev_times, st, flip_time, ops)
 
 f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .5 .25]); hold on;
 
@@ -84,9 +84,7 @@ zero   = [ev_times(3).classes{2,:}] == 2;
     psthAndBA(st , ev_times(3).times(E_hits & fast), ev_times(2).win + [-.2 .2], ops.spBinWidth/1000);
 
 % smooth ba
-baSm = conv2(smWin,1,ba', 'same')'./(ops.spBinWidth/1000);
-% baSm = smoothdata(ba, 2, 'movmean', smoothWin)./(ops.spBinWidth/1000);
-% keyboard
+baSm = conv2(smWin,1,ba', 'same')'./(ops.spBinWidth/1000); 
 
 % raster
 [tr,b] = find(ba);
@@ -383,8 +381,7 @@ if sum(early & ~licked) > ops.minEventCount
 
     % smooth ba
     baSm = conv2(smWin,1,ba', 'same')'./(ops.spBinWidth/1000);
-% baSm = smoothdata(ba, 2, 'movmean', smoothWin)./(ops.spBinWidth/1000);
-
+ 
     % raster
     [tr,b] = find(ba);
     [rasterX, yy] = rasterize(bins(b));
@@ -394,7 +391,7 @@ if sum(early & ~licked) > ops.minEventCount
     rasterY(2:3:end) = rasterY(2:3:end)+rasterScale;
 
     subplot(2, 9, 6);
-    mean_detrend = detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
+    mean_detrend = utils.detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
     shadedErrorBar(bins, mean_detrend, nanStdError(baSm,1), 'lineprops', {'color', ops.colors.F});
     % shadedErrorBar(bins, nanmean(baSm,1), nanStdError(baSm,1), 'lineprops', {'color', ops.colors.F});
     xlim([-.5 1])
@@ -410,8 +407,7 @@ if sum(early & ~licked) > ops.minEventCount
 
     % smooth ba
      baSm = conv2(smWin,1,ba', 'same')'./(ops.spBinWidth/1000);
-% baSm = smoothdata(ba, 2, 'movmean', smoothWin)./(ops.spBinWidth/1000);
-
+ 
     % raster
     [tr,b] = find(ba);
     [rasterX, yy] = rasterize(bins(b));
@@ -422,7 +418,7 @@ if sum(early & ~licked) > ops.minEventCount
 
     subplot(2, 9, 6);
     
-    mean_detrend = detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
+    mean_detrend = utils.detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
     shadedErrorBar(bins, mean_detrend, nanStdError(baSm,1), 'lineprops', {'color', ops.colors.S});
     % shadedErrorBar(bins, nanmean(baSm,1), nanStdError(baSm,1), 'lineprops', {'color', ops.colors.S});
     xlim([-.5 1])
@@ -454,7 +450,7 @@ if sum(late & ~licked) > ops.minEventCount
 
     subplot(2, 9, 7);
     
-    mean_detrend = detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
+    mean_detrend = utils.detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
     shadedErrorBar(bins, mean_detrend, nanStdError(baSm,1), 'lineprops', {'color', ops.colors.F});
     % shadedErrorBar(bins, nanmean(baSm,1), nanStdError(baSm,1), 'lineprops', {'color', ops.colors.F});
     xlim([-.5 1])
@@ -482,7 +478,7 @@ if sum(late & ~licked) > ops.minEventCount
 
     subplot(2, 9, 7);
     
-    mean_detrend = detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
+    mean_detrend = utils.detrend_resp(nanmean(baSm,1), isbetween(bins, [-1 -.5]), isbetween(bins, [0.8 1.2]));
     shadedErrorBar(bins, mean_detrend, nanStdError(baSm,1), 'lineprops', {'color', ops.colors.S});
     % shadedErrorBar(bins, nanmean(baSm,1), nanStdError(baSm,1), 'lineprops', {'color', ops.colors.S});
     xlim([-.5 1])

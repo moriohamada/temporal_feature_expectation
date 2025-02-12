@@ -15,8 +15,8 @@ resps.FRsd = resps.FRsd * ops.spBinWidth/1000;
 tf_idx = indexes.tf_short;% .* conts;
 conts = indexes.conts;
 
-% yls = [-3 5; -4 4; -6 8]; % for coarse area split
-yls = [-3 5; -3 5; -3 5; -3 5; -4 4; -6 8; -6 8]; % for fine split
+yls = [-3 5; -4 4; -6 8]; % for coarse area split
+% yls = [-3 5; -3 5; -3 5; -3 5; -4 4; -6 8; -6 8]; % for fine split
 
 for r = 1:length(areas)
     
@@ -38,22 +38,22 @@ for r = 1:length(areas)
     respsS = resps(slow & in_area,:);
     
     
-%     if r <= 2
-%     psthF   = nanmean(smoothdata((respsF.hitS - respsF.FRmu)./respsF.FRsd, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]),1);
-%     psthS   = nanmean(smoothdata((respsS.hitF - respsS.FRmu)./respsS.FRsd, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]),1);
-%     else
+    if r <= 2
+    psthF   = nanmean(smoothdata((respsF.hitS - respsF.FRmu)./respsF.FRsd, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]),1);
+    psthS   = nanmean(smoothdata((respsS.hitF - respsS.FRmu)./respsS.FRsd, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]),1);
+    else
     psthF   = nanmean(smoothdata((respsF.hitF - respsF.FRmu)./respsF.FRsd, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]),1);
     psthS   = nanmean(smoothdata((respsS.hitS- respsS.FRmu)./respsS.FRsd, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]),1);
-%     end
+    end
     psthF   = psthF(isbetween(t_ax.ch, [-.4 .4]));
     psthS   = psthS(isbetween(t_ax.ch, [-.4 .4]));
 %     psthF   = psthF(isbetween(t_ax.tf, [-.3 .3]));
 %     psthS   = psthS(isbetween(t_ax.tf, [-.3 .3]));
-%     if r >2
+    if r >2
     scale_F = range(psthS)/range(psthF);
-%     else
-%         scale_F=1;
-%     end
+    else
+        scale_F=1;
+    end
     
     % baseline
     subplot(3, 2, [1 2]); hold on
@@ -61,7 +61,7 @@ for r = 1:length(areas)
     X(isinf(X)) = nan;
     X = X(:,isbetween(t_ax.bl, [1 10]));
     t_bl = t_ax.bl(isbetween(t_ax.bl,[1 10]));
-    if r<=1
+    if r<=2
         X(conts==1,:) = fliplr(X(conts==1,:));
     else
         X(conts==-1,:) = fliplr(X(conts==-1,:));
@@ -84,7 +84,7 @@ for r = 1:length(areas)
        tf_type = tf_types{ii};
        X = smoothdata((resps.(tf_type) - resps.FRmu)./resps.FRsd, 2, 'movmean', [sm 0]);
        X(fast,:) = X(fast,:) * scale_F;
-       X = detrend_resp(X, isbetween(t_ax.tf, [-.4 -.1]), isbetween(t_ax.tf, [.7 1.2]));
+       X = utils.detrend_resp(X, isbetween(t_ax.tf, [-.4 -.1]), isbetween(t_ax.tf, [.7 1.2]));
        subplot(3,2,2+ii); hold on
        shadedErrorBar(t_ax.tf, nanmean(X(in_area & fast,:),1), ci_95_magnitude(X(in_area & fast,:),1), ...
                       'lineprops', {'color', ops.colors.F_pref, 'linewidth', 1.5})
