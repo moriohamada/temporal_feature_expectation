@@ -1,240 +1,110 @@
-function f = plot_gain_offset_changes_to_outlier(resps, t_ax, indexes, areas, ops)
-
-
-% conts = indexes.conts;
-% indexes.timeBL = indexes.timeBL .* indexes.conts;
-nN = height(resps);
-% keyboard
-%%
-f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .2 .4]);
-
-% resps.FRmu = nanmean(resps.bl(:,isbetween(t_ax.blOn, [2 10])),2);
-% resps.FRsd = nanstd(resps.bl(:,isbetween(t_ax.blOn, [2 10])),[],2);
-scat= .02;
-
-% resps.FRmu = nanmean(resps.bl(:,isbetween(t_ax.bl, [2 10])),2);
-% resps.FRsd = nanstd(resps.bl(:,isbetween(t_ax.bl, [2 10])),[],2);
-pre_pulse = isbetween(t_ax.tf, [-.4 -.1]);
-% % 
-pre_pulse_resp = cat(2, resps.FexpF(:, pre_pulse), resps.SexpF(:, pre_pulse));
+function quanitfy_gain_symmetry(avg_resps, t_ax, indexes, ops)
 % 
-resps.FRmu = nanmean(pre_pulse_resp, 2);
-resps.FRsd = nanstd(pre_pulse_resp,[],2);
+% For TF responsive units: quantify how gain changes to preferred vs unpreferred stimuli (in MOs/CP)
+% 
+% --------------------------------------------------------------------------------------------------
 
-% resps.FRmu = nanmean(resps.bl(:,isbetween(t_ax.bl, [1 11])),2);
-% resps.FRsd = nanstd(resps.bl(:,isbetween(t_ax.bl, [1 11])),[],2);
+rois = utils.group_rois;
+in_roi = utils.get_units_in_area(indexes.loc, rois{3,2});
 
-fast  = indexes.tf_short > 0 & indexes.tf_short_p < .05;
-slow  = indexes.tf_short < 0 & indexes.tf_short_p < .05;
+[tf_sensitive, tf_pref] = utils.get_tf_pref(indexes);
 
-for r = 1:length(areas)
-    
-    %%
-    in_area = contains(resps.loc, areas{r});
-    
-    % baseline shift --------------------------------------------------------------------------------------------------
-    pre_pulse = isbetween(t_ax.tf, [-.45 -.05]);
+multi = utils.get_multi(avg_resps);
 
-    fexpf = (nanmean(nanmean(cat(3, resps.SexpF(in_area & fast, pre_pulse), resps.FexpF(in_area & fast, pre_pulse)),3),2))./resps.FRsd(in_area&fast);
-        
-    fexps = (nanmean(nanmean(cat(3, resps.SexpS(in_area & fast, pre_pulse), resps.FexpS(in_area & fast, pre_pulse)),3),2))./resps.FRsd(in_area&fast);
-        
-    sexpf = (nanmean(nanmean(cat(3, resps.FexpF(in_area & slow, pre_pulse), resps.SexpF(in_area & slow, pre_pulse)),3),2))./resps.FRsd(in_area&slow);
-       
-    sexps = (nanmean(nanmean(cat(3, resps.FexpS(in_area & slow, pre_pulse), resps.SexpS(in_area & slow, pre_pulse)),3),2))./resps.FRsd(in_area&slow);
-   
-    
-%     fexpf = (nanmean(resps.FexpF(in_area & fast, pre_pulse),2));% - resps.FRmu(in_area & fast))./resps.FRsd(in_area&fast);
-%         
-%     fexps = (nanmean(resps.FexpS(in_area & fast, pre_pulse),2));% - resps.FRmu(in_area & fast))./resps.FRsd(in_area&fast);
-%         
-%     sexpf = (nanmean(resps.SexpF(in_area & slow, pre_pulse),2));% - resps.FRmu(in_area & slow))./resps.FRsd(in_area&slow);
-%        
-%     sexps = (nanmean(resps.SexpS(in_area & slow, pre_pulse),2));% - resps.FRmu(in_area & slow))./resps.FRsd(in_area&slow);
-        
-    
-	% remove huge outliers
-    range = [(fexpf - fexps); (sexpf - sexps)];
-    range = prctile(range, [2.5 97.5]);
-    
-    F = (fexpf - fexps);
-    F = F(isbetween(F, range));
-    S = (sexpf - sexps);
-    S = S(isbetween(S, range));
-    
-    ax=subplot(3,3,r);cla; hold on
-    violinPlot(F, 'histOri', 'left', 'widthDiv', [2 1], 'showMM', 0, 'xValues', 1,...
-             'color', mat2cell(ops.colors.F_pref_light, 1));
-    violinPlot(S, 'histOri', 'right', 'widthDiv', [2 2], 'showMM', 0, 'xValues', 1, ...
-             'color',mat2cell(ops.colors.S_pref_light, 1));  
-         
-    for n = 1:length(F)
-        scatter(1-.2+randn*scat, F(n), 12, 'filled', 'o', 'MarkerFaceColor', ops.colors.F_pref*.9, 'markerfacealpha', 1, 'MarkerEdgeColor', ops.colors.F_pref*.5)
-    end
+sel = in_roi & tf_sensitive & ~multi;
 
-    for n = 1:length(S)
-        scatter(1+.2+randn*scat, S(n),12, 'filled', 'o',  'MarkerFaceColor', ops.colors.S_pref*.9, 'markerfacealpha', 1,'MarkerEdgeColor',ops.colors.S_pref*.5)
-    end
-        plot([.5 1.5], [0 0], '--','color', [0 0 0])
-
-    % add mean, mean
-%     plot([.7 .7], prctile((fexpf-fexps),[5 95]), 'Color', 'k')
-%     plot([1.3 1.3], prctile((sexpf-sexps),[5 95]), 'Color', 'k')
-
-    plot([.7 .7], [nanmean(F)-nanStdError(F)*1.96, nanmean(F)+nanStdError(F)*1.96], ...
-         'Color', 'k')
-    plot([1.3 1.3], [nanmean(S)-nanStdError(S)*1.96, nanmean(S)+nanStdError(S)*1.96], ...
-         'Color', 'k')
-
-    scatter(1-.3, nanmean(F),60, '>', 'filled', 'MarkerFaceColor', ops.colors.F_pref, 'MarkerEdgeColor', 'k')
-    scatter(1+.3, nanmean(S),60, '<', 'filled', 'MarkerFaceColor', ops.colors.S_pref, 'MarkerEdgeColor', 'k')
-    % plot boxplot
-%     b1 = boxplot(fexpf-fexps, 'PlotStyle','compact', 'Colors', ops.colors.F_pref, 'Positions', .8,'Symbol','');
-%     b1 = boxplot(sexpf-sexps, 'PlotStyle','compact', 'Colors', ops.colors.S_pref, 'Positions', 1.2,'Symbol','');
-
-    p = signrank(F);
-    mysigstar(gca, 1-.2, -.25, p);
-    
-    p = signrank(S);
-    mysigstar(gca, 1+.2, -.25, p);
-    
-    % and difference of differences between f and s
-    [p] = permutationTest(F, S, 1000);
-
-    mysigstar(ax, [.8 1.2], .2, p);
-%     keyboard
-
-   %% % gain -----------------------------------------------------------------------------------------
-    resp_pulse = isbetween(t_ax.tf, [0.1 .4]);
-    pre_pulse  = isbetween(t_ax.tf, [-.4 -.05]);
-%     fexpf_g = (max(resps.FexpF(in_area & fast, resp_pulse),[],2) - resps.FRmu(in_area & fast))./resps.FRsd(in_area&fast);
-%     fexps_g = (max(resps.FexpS(in_area & fast, resp_pulse),[],2) - resps.FRmu(in_area & fast))./resps.FRsd(in_area&fast);
-%     sexpf_g = (max(resps.SexpF(in_area & slow, resp_pulse),[],2) - resps.FRmu(in_area & slow))./resps.FRsd(in_area&slow);
-%     sexps_g = (max(resps.SexpS(in_area & slow, resp_pulse),[],2) - resps.FRmu(in_area & slow))./resps.FRsd(in_area&slow);
-    
-%     fexpf_g = (max(resps.FexpF(in_area & fast, resp_pulse),[],2) - nanmean(resps.FexpF(in_area & fast, pre_pulse),2))./nanmean(resps.FexpF(in_area & fast, pre_pulse),2);
-%     fexps_g = (max(resps.FexpS(in_area & fast, resp_pulse),[],2) - nanmean(resps.FexpS(in_area & fast, pre_pulse),2))./nanmean(resps.FexpS(in_area & fast, pre_pulse),2);
-%     sexpf_g = (max(resps.SexpF(in_area & slow, resp_pulse),[],2) - nanmean(resps.SexpF(in_area & slow, pre_pulse),2))./nanmean(resps.SexpF(in_area & slow, pre_pulse),2);
-%     sexps_g = (max(resps.SexpS(in_area & slow, resp_pulse),[],2) - nanmean(resps.SexpS(in_area & slow, pre_pulse),2))./nanmean(resps.SexpS(in_area & slow, pre_pulse),2);
-
-
-%     fexpf_g = (max(resps.FexpF(in_area & fast, resp_pulse),[],2) - nanmean(resps.FexpF(in_area & fast, pre_pulse),2));%./nanmean(resps.FexpF(in_area & fast, pre_pulse),2);
-%     fexps_g = (max(resps.FexpS(in_area & fast, resp_pulse),[],2) - nanmean(resps.FexpS(in_area & fast, pre_pulse),2));%./nanmean(resps.FexpS(in_area & fast, pre_pulse),2);
-%     sexpf_g = (max(resps.SexpF(in_area & slow, resp_pulse),[],2) - nanmean(resps.SexpF(in_area & slow, pre_pulse),2));%./nanmean(resps.SexpF(in_area & slow, pre_pulse),2);
-%     sexps_g = (max(resps.SexpS(in_area & slow, resp_pulse),[],2) - nanmean(resps.SexpS(in_area & slow, pre_pulse),2));%./nanmean(resps.SexpS(in_area & slow, pre_pulse),2);
-
-    fexpf_g = (max(resps.FexpF(in_area & fast, resp_pulse),[],2) - nanmean(resps.FexpF(in_area & fast, pre_pulse),2));%./nanmean(resps.FexpF(in_area & fast, pre_pulse),2);
-    fexps_g = (max(resps.FexpS(in_area & fast, resp_pulse),[],2) - nanmean(resps.FexpS(in_area & fast, pre_pulse),2));%./nanmean(resps.FexpS(in_area & fast, pre_pulse),2);
-    sexpf_g = (max(resps.SexpF(in_area & slow, resp_pulse),[],2) - nanmean(resps.SexpF(in_area & slow, pre_pulse),2));%./nanmean(resps.SexpF(in_area & slow, pre_pulse),2);
-    sexps_g = (max(resps.SexpS(in_area & slow, resp_pulse),[],2) - nanmean(resps.SexpS(in_area & slow, pre_pulse),2));%./nanmean(resps.SexpS(in_area & slow, pre_pulse),2);
-
-    
-    fexpf_g = fexpf_g;
-    fexps_g = fexps_g;
-    sexpf_g = sexpf_g;
-    sexps_g = sexps_g;
-%     fexpf = (fexpf_g - fexpf);
-%     fexps = (fexps_g - fexps);
-%     sexpf = (sexpf_g - sexpf);
-%     sexps = (sexps_g - sexps);
-
-	% remove huge outliers
-%     keyboard
-    range = [(fexpf_g - fexps_g)./fexps_g; (sexpf_g - sexps_g)./sexpf_g];
-    range = prctile(range, [2.5 97.5]);
-    
-    F = (fexpf_g - fexps_g)./fexps_g;
-    F = F(isbetween(F, range));
-    S = (sexpf_g - sexps_g)./sexpf_g;
-    S = S(isbetween(S, range));
-    
-    ax=subplot(3,3,(3)+r); cla; hold on
-    violinPlot(F, 'histOri', 'left', 'widthDiv', [2 1], 'showMM', 0, 'xValues', 1, ...
-             'color', mat2cell(ops.colors.F_pref_light, 1));
-    violinPlot(S, 'histOri', 'right', 'widthDiv', [2 2], 'showMM', 0, 'xValues', 1, ...
-             'color',mat2cell(ops.colors.S_pref_light, 1));   
-    
-%     violinPlot(((fexpf_g - fexps_g)), 'histOri', 'left', 'widthDiv', [2 1], 'showMM', 0, 'xValues', 1, ...
-%              'color', mat2cell(ops.colors.F_pref_light, 1));
-%     violinPlot((sexpf_g - sexps_g), 'histOri', 'right', 'widthDiv', [2 2], 'showMM', 0, 'xValues', 1, ...
-%              'color',mat2cell(ops.colors.S_pref_light, 1));  
-    for n = 1:length(F)
-        
-        scatter(1-.2+randn*scat, F(n), 12, 'filled', 'o', 'MarkerFaceColor', ops.colors.F_pref*.9, 'markerfacealpha', .8, 'MarkerEdgeColor', ops.colors.F_pref*.5)
-    end
-
-    for n = 1:length(S)
-        scatter(1+.2+randn*scat,  S(n), 12, 'filled', 'o',  'MarkerFaceColor', ops.colors.S_pref*.9, 'markerfacealpha', .8,'MarkerEdgeColor', ops.colors.S_pref*.5)
-    end
-        plot([.5 1.5], [0 0], '--','color', [0 0 0])
-  
-%     plot([.7 .7], prctile((fexpf_g-fexps_g),[5 95]), 'Color', 'k')
-%     plot([1.3 1.3], prctile((sexpf_g-sexps_g),[5 95]), 'Color', 'k')
-    plot([.7 .7], [nanmean(F)-nanStdError(F)*1.96, nanmean(F)+nanStdError(F)*1.96], ...
-         'Color', 'k')
-    plot([1.3 1.3], [nanmean(S)-nanStdError(S), nanmean(S)+nanStdError(S)*1.96], ...
-         'Color', 'k')
-%     plot([.7 .7], [nanmean(F)-nanStdError(F)*1.96, nanmean(F)+nanStdError(F)*1.96], ...
-%          'Color', 'k')
-%     plot([1.3 1.3], [nanmean((sexpf_g - sexps_g))-nanStdError((sexpf_g - sexps_g)), nanmean((sexpf_g - sexps_g))+nanStdError((sexpf_g - sexps_g))*1.96], ...
-%          'Color', 'k')
-     
-    scatter(1-.3, nanmean(F),60, '>', 'filled', 'MarkerFaceColor', ops.colors.F_pref, 'MarkerEdgeColor', 'k')
-    scatter(1+.3, nanmean(S),60, '<', 'filled', 'MarkerFaceColor', ops.colors.S_pref, 'MarkerEdgeColor', 'k')
-    
-    p = signrank(F);
-%     [~,p] = ttest(F);
-%     [~,p] = ttest(F./fexps_g)
-    mysigstar(gca, 1-.2, -4.5, p);
-    
-    p = signrank(S);
-%     [h,p] = ttest(S);
-
-%     [~,p] = ttest(S./sexps_g)
-    mysigstar(gca, 1+.2, -4.5, p);
-    
-    % and difference of differences between f and s
-    p = permutationTest(F,S, 1000);
-%     p = ranksum((fexpf_g-fexps_g),(sexpf_g-sexps_g))/2;
-    mysigstar(ax, [1-.2 1.2], 4.5, p);
-    
-    %% pref - unpref
-    
-    %% relationship
-    
-    subplot(3,3,6+r); hold on;
-    
-%     scatter((fexpf-fexps),F, 30, 'filled',  'MarkerFaceColor', ops.colors.F_pref, 'MarkerEdgeAlpha', 0)
-%     scatter((sexpf-sexps),S, 30, 'filled',  'MarkerFaceColor', ops.colors.S_pref, 'MarkerEdgeAlpha', 0)
+% get responses
+pulse_types = {'FexpF', 'FexpS', 'SexpF', 'SexpS'};
+for pt = 1:length(pulse_types)
+    pulse = pulse_types{pt};
+    pulse_resps.(pulse) = smoothdata(...
+                         (avg_resps{sel, pulse} - avg_resps{sel, 'FRmu'})./avg_resps{sel, 'FRsd'}, ...
+                         2, 'movmean', [ops.spSmoothSize/ops.spBinWidth 0]);;
 end
 
-%%
+% calculate response gain to preferred and unpreferred
+resp_t = isbetween(t_ax.tf, ops.respWin.tfShort);
+pre_t  = isbetween(t_ax.tf, ops.respWin.tfContext);
+fast   = tf_pref(sel)>0;
+slow   = tf_pref(sel)<0;
+inds   = indexes(sel,:);
 
-% for ii = 1:3
-%     ax=subplot(3,3,ii);
-%     hold on;
-%     ax.XLim = [.5 1.5];
-%     plot([.5 1.5], [0 0], '--','color', [0 0 0])
-%     ax.YLim = [-.3 .3];
-%     xticks([])
-%     ax.XColor = 'none';
-% end
-for ii = 4:6
-    ax=subplot(3,3,ii);
-    hold on;
-    ax.XLim = [.5 1.5];
-    plot([.5 1.5], [0 0], '--','color', [0 0 0])
-    ax.YLim = [-4 4];
-    xticks([])
-    ax.XColor = 'none';
+gain.Fpref  = inds.tfExpF_z_peakF(fast) - inds.tfExpS_z_peakF(fast);
+gain.Fupref = inds.tfExpF_z_peakS(fast) - inds.tfExpS_z_peakS(fast);
+
+gain.Ftotal = gain.Fpref - gain.Fupref;
+gain.Fsym   = gain.Fpref + gain.Fupref;
+
+gain.Spref  = inds.tfExpS_z_peakS(slow) - inds.tfExpF_z_peakS(slow);
+gain.Supref = inds.tfExpS_z_peakF(slow) - inds.tfExpF_z_peakF(slow);
+gain.Stotal = gain.Spref - gain.Supref;
+gain.Ssym   = gain.Spref + gain.Supref;
+% 
+% gain.Fpref   = (absoluteMax(pulse_resps.FexpF(fast, resp_t),2) - nanmean(pulse_resps.FexpF(fast, pre_t),2)) - ...
+%                (absoluteMax(pulse_resps.FexpS(fast, resp_t),2) - nanmean(pulse_resps.FexpS(fast, pre_t),2));
+% gain.Fupref  = (absoluteMax(pulse_resps.SexpF(fast, resp_t),2) - nanmean(pulse_resps.SexpF(fast, pre_t),2)) - ...
+%                (absoluteMax(pulse_resps.SexpS(fast, resp_t),2) - nanmean(pulse_resps.SexpS(fast, pre_t),2));
+% gain.F_total = (absoluteMax(pulse_resps.FexpF(fast, resp_t) - pulse_resps.SexpF(fast, resp_t),2)) - ...
+%                (absoluteMax(pulse_resps.SexpF(fast, resp_t) - pulse_resps.SexpS(fast, resp_t),2))
+%           
+% gain.Spref  = (absoluteMax(pulse_resps.SexpS(slow, resp_t),2) - nanmean(pulse_resps.SexpS(slow, pre_t),2)) - ...
+%               (absoluteMax(pulse_resps.SexpF(slow, resp_t),2) - nanmean(pulse_resps.SexpF(slow, pre_t),2));
+% gain.Supref = (absoluteMax(pulse_resps.FexpS(slow, resp_t),2) - nanmean(pulse_resps.FexpS(slow, pre_t),2)) - ...
+%               (absoluteMax(pulse_resps.FexpF(slow, resp_t),2) - nanmean(pulse_resps.FexpF(slow, pre_t),2));
+%           
+% gain.S_total = (absoluteMax(pulse_resps.SexpS(fast, resp_t) - pulse_resps.FexpS(fast, resp_t),2)) - ...
+%                (absoluteMax(pulse_resps.FexpS(fast, resp_t) - pulse_resps.SexpS(fast, resp_t),2))
+
+gains_pref  = [gain.Fpref; gain.Spref];
+gains_upref = [gain.Fupref; gain.Supref];
+gains_total = [gain.Ftotal; gain.Stotal];
+gains_sym   = [gain.Fsym; gain.Ssym];
+%% Plot
+
+f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .11 .12]);
+hold on;
+nN = length(gains_pref);
+jitter = .05;
+
+plot([0.2 4.3], [0 0], '-k')
+gains_all = [gains_pref, gains_upref, gains_total, gains_sym];
+clrs = [ops.colors.F; ops.colors.S; [196 146 186]/255; [238 181 120]/255];
+for ii = 1:4
+    data = gains_all(:,ii);
+    [data, rmv] = rmoutliers(data);
+    scatter(ii*ones(nN-sum(rmv),1)+randn(nN-sum(rmv),1)*jitter, data, 10, 'filled', ...
+            'MarkerFaceColor', clrs(ii,:), 'MarkerFaceAlpha', .5, ...
+            'MarkerEdgeColor', 'k', 'MarkerEdgeAlpha', .2);
+    gains_all(rmv, ii) = nan;
+end
+% plot(gains_all', 'color', [.5 .5 .5 .2], 'linewidth', .1);
+
+% violin plots & mean/ci
+for ii=1:4
+     violinPlot(gains_all(:,ii),  'histori', 'left', 'widthDiv', [2 1], 'showMM', 0, 'xValues', ii-.1, ...
+                  'color', clrs(ii,:));
+     mu = nanmean(gains_all(:,ii));
+     ci = ci_95_magnitude(gains_all(:,ii));
+     scatter(ii+.2, mu, 50, '<', ...
+             'MarkerFaceColor', clrs(ii,:), 'MarkerFaceAlpha', 1, ...
+             'MarkerEdgeColor', 'k', 'MarkerEdgeAlpha', 1);
+     plot([ii ii]+.2, [-ci ci]+mu, '-k', 'linewidth', 1);   
+end
+ylim([-20 20])
+
+% get p values
+[~, ps] = ttest(gains_all);
+
+for ii=1:4
+    p = ps(ii);
+    symbol = get_sig_symbol(p);
+    text(ii-.1, 20, symbol, 'HorizontalAlignment', 'center', 'FontName', 'arial', 'FontSmoothing', 8)
 end
 
-subplot(3,3,1)
-ylabel('\DeltaBaseline shift')
-subplot(3,3,4)
-ylabel('\DeltaPeak amplitude (%)')
-%%
-% keyboard
+set(gca, 'xcolor', 'none')
 
-
+if ops.saveFigs
+save_figures_multi_format(f, fullfile(ops.saveDir, 'expectation', 'ramp_symmetry'), {'fig', 'svg' });
 end
+end
+

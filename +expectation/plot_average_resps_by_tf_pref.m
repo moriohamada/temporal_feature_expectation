@@ -1,215 +1,95 @@
-function f_tf = plot_average_time_tf_sensitive_response(resps, t_ax, indexes, areas, ops)
-% 
-% Plot mean activity of F/S preferring units and E/L preferring units to TF pulses & time
-% 
-% --------------------------------------------------------------------------------------------------
+function plot_average_resps_by_tf_pref(avg_resps, t_ax, indexes, ops)
 
-%%
-off = [.1 .1 -.1];
-% off_early = [.2 .05 -.1];
-% first shuffle around all cells so there arent weird correlations
-shuffle = randperm(height(indexes));
-resps = resps(shuffle,:);
-indexes = indexes(shuffle,:);
+% select only good units
+multi = utils.get_multi(avg_resps, indexes);
 
-% sort units by region
-locs = resps.loc;
-units_by_loc = [];
-n_per_loc = [];
-for r = 1:length(areas)
-    this_roi_areas = areas{r};
+rois = utils.group_rois;
 
-    in_area = contains(resps.loc, this_roi_areas);
-    units_by_loc = vertcat(units_by_loc, find(in_area));
-    n_per_loc(end+1) = sum(in_area);
+[tf_sensitive, tf_pref] = utils.get_tf_pref(indexes);
+[time_sensitive, time_pref] = utils.get_time_pref(indexes); 
+% get units from eslf contingency animals
+eslf =  indexes.conts==-1;
+avg_resps = utils.match_FS_sds(avg_resps, indexes);
+
+%% Plot TF pulse and baseline firing by area
+
+clrs = [ops.colors.S_pref; ops.colors.F_pref]; % slow, fast
+ 
+flip_time = [0 0 0]; % set to 1 to flip time, or 0 to flip TF
+
+evs = {'FexpF', 'FexpS', 'SexpF', 'SexpS'};
+
+% set ylims
+yls = [-.3 .3; -.15 .25;  -.6 .7];  
+
+for r = 1:height(rois)
+    
+    in_roi = utils.get_units_in_area(indexes.loc, rois{r,2}) & ~multi;
+    
+    fast    = tf_pref>0 & tf_sensitive & in_roi;
+    slow    = tf_pref<0 & tf_sensitive & in_roi;
+    
+    % label preferences: -1, 0, 1
+    prefs = zeros(size(fast));
+    prefs(fast) = 1;
+    prefs(slow) = -1; 
+    
+    % flip TF preference as needed if not flipping time
+    % if ~flip_time(r)
+    %     prefs(eslf) = -1*prefs(eslf);
+    % end
+     
+    f = figure('Units', 'normalized', 'OuterPosition', [.1+r*.05 .1 .07 .25]);
+    
+    % loop through pref types
+    for pref_i = [1, 2]
+        
+        sel = prefs == sign(pref_i-1.5);
+
+        %% Baseline activity
+        
+        subplot(3, 2, [1 2]); hold on
+        R = (avg_resps{sel, 'bl'} - avg_resps{sel, 'FRmu'}) ./ avg_resps{sel, 'FRsd'};
+        % R = (R - mean(R(:, isbetween(t_ax.bl, [2 10])),2)) ;
+        R = R(:, isbetween(t_ax.bl, [-1 11]));
+
+        if flip_time(r)
+            R(eslf(sel), :) = -(R(eslf(sel), :));
+        end
+        R = smoothdata(R, 2, 'movmean', 5*ops.spSmoothSize/ops.spBinWidth);
+        shadedErrorBar(t_ax.bl(isbetween(t_ax.bl, [-1 11])), R, {@nanmean @ci_95_magnitude}, ...
+                       'lineprops', {'color', clrs(pref_i,:), 'linewidth', 1.5});
+                   
+        xlim([0 10])
+        
+        %% TF pulse responses
+          
+        for evi = 1:4
+            ev = evs{evi};
+            subplot(3,2,2+evi); hold on
+        
+            R = (avg_resps{sel, ev} - avg_resps{sel, 'FRmu'}) ./ avg_resps{sel, 'FRsd'}; 
+            R = smoothdata(R, 2, 'movmean', [ops.spSmoothSize/ops.spBinWidth]);
+            R = utils.detrend_resp(R, isbetween(t_ax.tf, [-.5 -.1]), isbetween(t_ax.tf, [.7 1.2])); 
+
+            % if ~flip_time(r)
+            %     R(eslf(sel),:) = -1*R(eslf(sel),:);
+            % end
+            shadedErrorBar(t_ax.tf, R, {@nanmean @ci_95_magnitude}, ...
+                           'lineprops', {'color', clrs(pref_i,:), 'linewidth', 1.5}); 
+%             plot(t_ax.tf, R','color', clrs(pref_i,:));
+            xlim([-.2 1])          
+            ylim(yls(r,:))
+        end 
+    end 
+    if ops.saveFigs
+        save_figures_multi_format(f, fullfile(ops.saveDir, 'expectation', ['avg_tf_responses_', rois{r,1}]), {'fig', 'svg', 'png'})
+    end
 end
-n_per_loc = cumsum(n_per_loc);
-n_per_loc = [0, n_per_loc];
-
-% sort again
-resps = resps(units_by_loc,:);
-indexes = indexes(units_by_loc,:);
-conts = indexes.conts;
-
-% indexes.timeBL = indexes.timeBL .* indexes.conts;
-nN = height(resps);
-
-resps.FRsd = resps.FRsd * ops.spBinWidth/1000;
-%% Fast slow split
-% 
-% resps.FRmu = nanmean(resps.bl(:,isbetween(t_ax.bl, [1 11])),2);
-% resps.FRsd = nanstd(resps.bl(:,isbetween(t_ax.bl, [1 11])),[],2);
-f_tf = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .2 .35]);
-
-yl = [-3 3];
-sm = [20 20];
-for r = 1:length(areas)
-    
-    this_area_idx = n_per_loc(r)+1:n_per_loc(r+1);
-    in_area = logical(zeros(size(resps.bl,1),1));
-    in_area(this_area_idx) = 1;
-    fast  = indexes.tf_short > 0;
-    slow  = indexes.tf_short < 0;
-    
-    % need to flip  base!
-   
-    % baseline
-    subplot(length(areas), 6, (r-1)*6+[1 2]); hold on
-    X = smoothdata((resps.bl - resps.FRmu)./resps.FRsd, 2, 'movmean', [50 50]);%.*conts;
-    X(isinf(X)) = nan;
-    X = X.*conts;
-    shadedErrorBar(t_ax.bl, smoothdata(nanmean(X(in_area & fast,:),1),'movmean',sm), smoothdata(nanStdError(X(in_area & fast,:),1), 'movmean', sm), ...
-                   'patchsaturation', .1, 'lineprops', {'color', ops.colors.F_pref})
-    shadedErrorBar(t_ax.bl, smoothdata(nanmean(X(in_area & slow,:),1), 'movmean', sm), smoothdata(nanStdError(X(in_area & slow,:),1), 'movmean', sm), ...
-                   'patchsaturation', .1, 'lineprops', {'color', ops.colors.S_pref})
-    xlim([2 10])
-    ylim([-.5 .5])
-%     set(gca, 'YColor', 'none')
-    offsetAxes
-    % fast early outlier
-    subplot(length(areas), 6, (r-1)*6+3); hold on
-    X = (resps.FexpF - resps.FRmu) ./ resps.FRsd;
-    X(isinf(X)) = nan;
-%     X = X.*conts;
-
-%     X = smoothdata(X, 2, 'movmean', sm);
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & fast,:),1), nanStdError(X(in_area & fast,:),1), ...
-                   'patchsaturation', .1,'lineprops', {'color', ops.colors.F_pref})
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & slow,:),1), nanStdError(X(in_area & slow,:),1), ...
-                   'patchsaturation', .1,'lineprops', {'color', ops.colors.S_pref})
-    plot([0 0], yl, 'color', 'r')
-    xlim([-.2 .6])
-    ylim([yl])
-    set(gca, 'YColor', 'none')
-
-    % slow early outlier
-    subplot(length(areas), 6, (r-1)*6+5); hold on
-    X = (resps.SexpF - resps.FRmu) ./ resps.FRsd;
-%     X = smoothdata(X, 2, 'movmean', sm);
-    X(isinf(X)) = nan;
-%     X = X.*conts;
-
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & fast,:),1), nanStdError(X(in_area & fast,:),1), ...
-                   'patchsaturation', .1,'lineprops', {'color', ops.colors.F_pref})
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & slow,:),1), nanStdError(X(in_area & slow,:),1), ...
-                   'patchsaturation', .1,'lineprops', {'color', ops.colors.S_pref})
-    plot([0 0], yl, 'color', 'b')
-    xlim([-.2 .6])
-    ylim([yl])
-    set(gca, 'YColor', 'none')
-
-    % fast late outlier
-    subplot(length(areas), 6, (r-1)*6+4); hold on
-    X = (resps.FexpS - resps.FRmu) ./ resps.FRsd;
-        X(isinf(X)) = nan;
-%     X = X.*conts;
-
-%     X = smoothdata(X, 2, 'movmean', sm);
-
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & fast,:),1)+off(r), nanStdError(X(in_area & fast,:),1), ...
-                   'patchsaturation', .1,'lineprops', {'color', ops.colors.F_pref})
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & slow,:),1)-off(r), nanStdError(X(in_area & slow,:),1), ...
-                    'patchsaturation', .1,'lineprops', {'color', ops.colors.S_pref})
-    plot([0 0], yl,'color', 'r')
-    xlim([-.2 .6])
-    ylim([yl])
-    set(gca, 'YColor', 'none')
-    
-    % slow late outlier
-    subplot(length(areas), 6, (r-1)*6+6); hold on
-    X = (resps.SexpS - resps.FRmu) ./ resps.FRsd;
-        X(isinf(X)) = nan;
-%     X = X.*conts;
-% 
-%     X = smoothdata(X, 2, 'movmean', sm);
-
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & fast,:),1)+off(r), nanStdError(X(in_area & fast,:),1), ...
-                   'patchsaturation', .1,'lineprops', {'color', ops.colors.F_pref})
-    shadedErrorBar(t_ax.tf, nanmean(X(in_area & slow,:),1)-off(r), nanStdError(X(in_area & slow,:),1), ...
-                   'patchsaturation', .1, 'lineprops', {'color', ops.colors.S_pref})
-    plot([0 0], yl, 'color', 'b')
-
-    xlim([-.2 .6]) 
-    ylim([yl])
-    set(gca, 'YColor', 'none')
-end
-% 
-% %% early late split
-% 
-% 
-% f_time = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .2 .35]);
-% 
-% for r = 1:length(areas)
-%     
-%     this_area_idx = n_per_loc(r)+1:n_per_loc(r+1);
-%     in_area = logical(zeros(size(resps.bl,1),1));
-%     in_area(this_area_idx) = 1;
-% %     fast  = indexes.tfExpF > 0;
-% %     slow  = indexes.tfExpS < 0;
-%     if r == 1
-%         early = indexes.timeBL < -.1;
-%         late  = indexes.timeBL > 0.1;
-%     else
-%         early = indexes.timeBL < 0;
-%         late  = indexes.timeBL > 0;
-%     end
-%     
-%     % baseline
-%     subplot(length(areas), 8, (r-1)*8+[1 2]); hold on
-%     X = (resps.bl - resps.FRmu)./resps.FRsd;
-%     shadedErrorBar(t_ax.bl, nanmean(X(in_area & early,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.F_pref})
-%     shadedErrorBar(t_ax.bl, nanmean(X(in_area & late,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.S_pref})
-%     xlim([-1 10])
-%     ylim([yl])
-%     
-%     % early early outlier
-%     subplot(length(areas), 6, (r-1)*6+3); hold on
-%     X = (resps.FexpF - resps.FRmu) ./ resps.FRsd;
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & early,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.F_pref})
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & late,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.S_pref})
-%     plot([0 0], yl, 'color', 'r')
-%     xlim([-.2 .6])
-%     ylim([yl])
-%     
-%     % late early outlier
-%     subplot(length(areas), 6, (r-1)*6+4); hold on
-%     X = (resps.SexpF - resps.FRmu) ./ resps.FRsd;
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & early,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.F_pref})
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & late,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.S_pref})
-%     plot([0 0], yl, 'color', 'b')
-%     xlim([-.2 .6])
-%     ylim([yl])
-%     % early late outlier
-%     subplot(length(areas), 6, (r-1)*6+5); hold on
-%     X = (resps.FexpS - resps.FRmu) ./ resps.FRsd;
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & early,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.F_pref})
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & late,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.S_pref})
-%     plot([0 0], yl, 'color', 'r')
-%     xlim([-.2 .6])
-%     ylim([yl])
-%     % late late outlier
-%     subplot(length(areas), 6, (r-1)*6+6); hold on
-%     X = (resps.SexpS - resps.FRmu) ./ resps.FRsd;
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & early,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.F_pref})
-%     shadedErrorBar(t_ax.tf, nanmean(X(in_area & late,:),1), nanStdError(X(in_area & early,:),1), ...
-%                    'lineprops', {'color', ops.colors.S_pref})
-%                    plot([0 0], yl, 'color', 'b')
-% 
-%     xlim([-.2 .6]) 
-%     ylim([yl])
-% end
-
-
 
 end
+
+
+
 
 

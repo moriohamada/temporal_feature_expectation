@@ -8,15 +8,7 @@ function analyse_IO_effects(sessions, trials_all, sp_all, daq_all, neuron_info, 
 %%
 flip_times = loadVariable(fullfile(ops.dataDir, 'flip_times.mat'), 'flip_time');
 animals = unique({sessions.animal});
-
-rois = {{'MOs', 'BG'}, ...
-        {'V1', 'Visual thalamus', 'Sensory thalamus'}};    
-roi_titles = {'MOs_CP', 'Vis'};
-
-% 
-% rois = {{'V1', 'Visual thalamus', 'Visual midbrain'}, ...
-%         {'PPC','Visual cortex',  'Sensory thalamus'}, ...
-%         {'MOs', 'BG'}};    
+ 
 % roi_titles = {'MOs_CP', 'PPC', 'Vis'};
 allen_areas = {};
 for r = 1:length(rois)
@@ -132,45 +124,6 @@ for s = 1:length(sessions)
     else
         resps = [resps; r];
     end
-    
-    %     [fr_mu, fr_sd, tf_tax] = loadVariables(fullfile(ops.eventPSTHdir, sprintf('%s_%s.mat', animal, session)), ...
-%                                   'fr_mu', 'fr_sd', 'tf_tax');     
-%     % load in psths - first round to get distribution of pre-tf values
-%     for tf_i = 1:length(tf_resp_names)
-%         tf_resp = tf_resp_names{tf_i};
-%         psth = loadVariable(fullfile(ops.eventPSTHdir, sprintf('%s_%s.mat', animal, session)), ...
-%                             sprintf('psth_%s', tf_resp));
-%         pre_activity = (nanmean(psth(:,:,isbetween(tf_tax, ops.respWin.tfContext)),3) - fr_mu) ./ fr_sd;
-%         post_mean    = (nanmean(psth(:,:,isbetween(tf_tax, ops.respWin.tfShort)), 3) - fr_mu) ./ fr_sd;
-%         pre_post     = cat(3, pre_activity, post_mean-pre_activity);
-%         
-%         eval([lower(tf_resp) ' = pre_post;']);
-%         clear psth
-%     end
-%     
-%     all_pre = cat(2, fexpf(:,:,1), fexps(:,:,1), sexpf(:,:,1), sexps(:,:,1));
-%     mean_pre = nanmean(all_pre,2);
-%     sd_pre   = nanstd(all_pre,[],2);
-%     
-%     for tf_i = 1:length(tf_resp_names)
-%         tf_resp = lower(tf_resp_names{tf_i});
-%         eval([tf_resp '_pre = (' tf_resp '(:,:,1) - mean_pre) ./ sd_pre;']);
-%         eval([tf_resp '_post = ' tf_resp '(:,:,2);']);
-%     end
-%     
-%     % create struct
-% %     for tf_i = 1:length(tf_resp_names)
-% %         tf_resp = lower(tf_resp_names{tf_i});
-% %         eval(['r.' tf_resp '_pre = ' tf_resp ';']);
-% %     end
-%     r  = table2struct(table(fr_mu, fr_sd, fexpf_pre, fexpf_post, fexps_pre, fexps_post, sexpf_pre, sexpf_post, sexps_pre, sexps_post));
-%    
-%     if isempty(resps)
-%         resps = r;
-%     else
-%         resps = [resps; r];
-%     end
-%     clear fexpf_pre fexpf_post fexps_pre fexps_post sexpf_pre sexpf_post sexps_pre sexps_post r fexpf fexps sexpf sexps
 end
 
 %% save temporarily
@@ -278,90 +231,7 @@ for r = 1:length(roi_titles)
      offsetAxes
 end
 
-
-%%
-% %% Visualize, separated by expectation
-% close all
-% 
-% f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .15 .35]);
-% 
-% cols = {ops.colors.F, ops.colors.F_light, ops.colors.S_light, ops.colors.S};
-% stl  = {'-', '--', '--', '-'};
-% 
-% 
-% % visualize just over course of trial
-% % avg_gains_normed = mean_gains - nanmean(mean_gains, 2);
-% 
-% cols = {ops.colors.F, ops.colors.F_light, ops.colors.S_light, ops.colors.S};
-% 
-% stl  = {'-', '--', '--', '-'};
-% sm=2;
-% 
-% for r = 1:length(roi_titles)
-%     subplot(3,2,r); hold on;
-%     this_roi_areas = allen_areas{r};
-%     in_area = contains(good_inds.loc, this_roi_areas);
-%     
-%     gains_mean_F = mean_gains(in_area & fast_pref, :, :);
-%     gains_mean_S = mean_gains(in_area & slow_pref, :, :); 
-%     
-%     shadedErrorBar(0:n_activity_bins-1, ...
-%                     smoothdata(nanmean([squeeze(gains_mean_F(:,1,:)); squeeze(gains_mean_F(:,2,:)); squeeze(gains_mean_S(:,3,:)); squeeze(gains_mean_S(:,4,:))],1), 'movmean', sm), ...
-%                     smoothdata(nanStdError([squeeze(gains_mean_F(:,1,:)); squeeze(gains_mean_F(:,2,:)); squeeze(gains_mean_S(:,3,:)); squeeze(gains_mean_S(:,4,:))],1), 'movmean', sm), ...
-%                     'lineprops', {'color', ops.colors.F, 'linestyle', stl{tf_i}, 'linewidth', 2}); 
-%     shadedErrorBar(0:n_activity_bins-1, ...
-%                     smoothdata(nanmean([squeeze(gains_mean_F(:,3,:)); squeeze(gains_mean_F(:,4,:)); squeeze(gains_mean_S(:,1,:)); squeeze(gains_mean_S(:,2,:))],1), 'movmean', sm), ...
-%                     smoothdata(nanStdError([squeeze(gains_mean_F(:,3,:)); squeeze(gains_mean_F(:,4,:)); squeeze(gains_mean_S(:,1,:)); squeeze(gains_mean_S(:,2,:))],1), 'movmean', sm), ...
-%                     'lineprops', {'color', ops.colors.S, 'linestyle', stl{tf_i}, 'linewidth', 2});
-%     title(strrep(roi_titles{r}, '_', ' '));
-%     xlim([0 n_activity_bins-1])
-%     ylabel('Response gain');
-%     xlabel('Pre-pulse activity'); 
-% end
-% 
-% % split by expectation
-% avg_gains_normed = mean_gains - nanmean(mean_gains, 2);
-% 
-% for r = 1:length(roi_titles)
-%     subplot(3,2,r+2); hold on;
-%     this_roi_areas = allen_areas{r};
-%     in_area = contains(good_inds.loc, this_roi_areas);
-%     
-%     gains_mean_F = avg_gains_normed(in_area & fast_pref, :, :);
-%     gains_mean_S = avg_gains_normed(in_area & slow_pref, :, :);
-%     
-%     % resp to preferred stim, expecting preferred (fexpf for fast_pref and sexps for slow_pref)
-%     s1=shadedErrorBar(0:n_activity_bins-1, ...
-%                     smoothdata(nanmean([squeeze(gains_mean_F(:,1,:)); squeeze(gains_mean_S(:,4,:))],1), 'movmean', sm), ...
-%                     smoothdata(nanStdError([squeeze(gains_mean_F(:,1,:)); squeeze(gains_mean_S(:,4,:))],1), 'movmean', sm), ...
-%                     'lineprops', {'color', ops.colors.F, 'linestyle', '-', 'linewidth', 2});
-%     
-%     % resp to preferred stim, expecting unpref (fexps for fast_pref and sexpf for slow_pref)
-%     s2=shadedErrorBar(0:n_activity_bins-1, ...
-%                     smoothdata(nanmean([squeeze(gains_mean_F(:,2,:)); squeeze(gains_mean_S(:,3,:))],1), 'movmean', sm), ...
-%                     smoothdata(nanStdError([squeeze(gains_mean_F(:,2,:)); squeeze(gains_mean_S(:,3,:))],1), 'movmean', sm), ...
-%                     'lineprops', {'color', ops.colors.F_light, 'linestyle', '--', 'linewidth', 2}); 
-%                 
-%     % resp to unpreferred stim, expecting preferred (sexpf for fast_pref and fexps for slow_pref)
-%     s3=shadedErrorBar(0:n_activity_bins-1, ...
-%                     smoothdata(nanmean([squeeze(gains_mean_F(:,3,:)); squeeze(gains_mean_S(:,2,:))],1), 'movmean', sm), ...
-%                     smoothdata(nanStdError([squeeze(gains_mean_F(:,3,:)); squeeze(gains_mean_S(:,2,:))],1), 'movmean', sm), ...
-%                     'lineprops', {'color', ops.colors.S, 'linestyle', '-', 'linewidth', 2});
-%     
-%     % resp to unpreferred stim, expecting unpref (sexps for fast_pref and fexpf for slow_pref)
-%     s4=shadedErrorBar(0:n_activity_bins-1, ...
-%                     smoothdata(nanmean([squeeze(gains_mean_F(:,4,:)); squeeze(gains_mean_S(:,1,:))],1), 'movmean', sm), ...
-%                     smoothdata(nanStdError([squeeze(gains_mean_F(:,4,:)); squeeze(gains_mean_S(:,1,:))],1), 'movmean', sm), ...
-%                     'lineprops', {'color', ops.colors.S_light, 'linestyle', '--', 'linewidth', 2});             
-%     ylabel('Response gain');
-%     xlabel('Pre-pulse activity');      
-%     
-% end
-% 
-%  l=legend([s1.mainLine, s2.mainLine, s3.mainLine, s4.mainLine], ...
-%         {'Resp pref, Exp pref', 'Resp pref, Exp unpref', 'Resp unpref, Exp pref', 'Resp unpref, Exp unpref'}, ...
-%         'box', 'off', 'Position', [0.3099 0.1135 0.4193 0.1656])  
-
+ 
 %% Fit linear models to each unit 
 
 % for every neuron, figure out how context-dependent IO effects are
@@ -465,18 +335,14 @@ for r = 1:length(roi_titles)
         scatter(1-.3, nanmean(vals), 50, '>', 'MarkerFaceColor', cols{r}, 'MarkerEdgeColor', 'k');
         
         [~,p] = ttest(sig_coeffs(in_area,ii));
-%         p = signrank(coeffs(in_area,ii));
-        yl = ylim;
+         yl = ylim;
         mysigstar(gca, 1, yl(2)+.1*range(yl), p)
         xticklabels(coeff_labels{ii});
         if ii>1
             set(gca, 'Ycolor', 'none')
         end
         xlim([.5 1.3])
-%         offsetAxes
-    end
-%     xticks([1 2 3])
-%     title(roi_titles{r})
+     end 
     
 end
 %% Visualize coefficients for context, gain, interaction
@@ -492,12 +358,10 @@ for r = 1:length(roi_titles)
         subplot(2,3,(r-1)*3 + ii); hold on
         edges = prctile(coeffs(:,ii), [1 99.5]);
         edges = linspace(edges(1),edges(2),12);
-%         [~,edges] = histcounts(log10(coeffs(:,ii)));
-        h=histogram(coeffs(in_area,ii), edges, 'Normalization', 'probability', 'FaceColor', cols{r}, 'edgealpha', 0);
+         h=histogram(coeffs(in_area,ii), edges, 'Normalization', 'probability', 'FaceColor', cols{r}, 'edgealpha', 0);
         
         % test signf
-%         [~,p, ci] = ttest(coeffs(in_area,ii));
-        p = signrank(coeffs(in_area,ii));
+         p = signrank(coeffs(in_area,ii));
         % plot median and sign
         med  = mean(coeffs(in_area,ii));
         ci_95 = ci_95_magnitude(coeffs(in_area,ii));
@@ -522,17 +386,11 @@ for r = 1:length(roi_titles)
         end
         
         text(med, yl(2)+range(yl)*.21, sig_sign, 'FontSize', sz, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
-%         ylim([0 yl(2)+range(yl)*.25])
-        
+         
         % add scatter
         yvals = rand(size(coeffs(in_area,ii))) * range(yl)*.2 + diff(yl)/3;
-%         scatter(coeffs(in_area,ii), yvals, 15, 'MarkerFaceColor', cols{r}*.8, 'MarkerFaceAlpha', .4, 'MarkerEdgeAlpha',0)
-
-        title(coeff_labels{ii})
-%         yl = ylim;
-%         yticks(round(yl,1));
-%         ylim(round(yl,1))
-        
+ 
+        title(coeff_labels{ii}) 
     end
     
 end
