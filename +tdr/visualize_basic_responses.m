@@ -1,89 +1,97 @@
-function f = visualize_2d_activity(proj, t_ax, axes, evs, ops)
-% Visualize activity projected along dimensions specified in 'axes'.
-% keyboard
-%%
-f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .05*size(evs,1) .25]);
+function visualize_basic_responses(tdr_ax, avg_resps, t_ax, glm_kernels, ops)
+% 
+% Visualize TF pulse responses, changes, and hit-aligned activity projected onto TDR axes
+% 
+% --------------------------------------------------------------------------------------------------
 
-%% Make 1D plots
-for ii = 1:length(axes)
+%% Get average responses of units with glm fits
+resps_fitted = glm.keep_glm_fitted_units(avg_resps, glm_kernels);
+multi = utils.get_multi(resps_fitted);
+
+%% Plot activity by area
+close all
+rois = utils.group_rois;
+ax2plot = {'tf', 'lick'};
+
+for r = 3:height(rois)   
+    roi = rois{r,1};
+    in_roi = utils.get_units_in_area(resps_fitted.loc, rois{r,2}) & ~multi;
+    in_roi_resps = resps_fitted(in_roi,:);
+    proj = tdr.project_resps(tdr_ax.(roi), in_roi_resps, ax2plot);
     
-    ax_name = axes{ii};
+    f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .2 .1*length(ax2plot)]);
     
-    % Plot projs
-    for jj = 1:size(evs,1)
+    for axi = 1:length(ax2plot)
         
-        subplot(4, size(evs,1), jj + size(evs,1)*(ii-1)); 
-        hold on
-        for kk = 1:numel(evs{jj, 1})
-            sm = smoothdata(proj.(ax_name).(evs{jj,1}{kk}), 'movmean', evs{jj,5}{1});
-            plot(t_ax.(evs{jj, 2}{1}), sm, 'linewidth', 1.5, 'color', evs{jj, 3}{1}(kk,:))
+        ylmax = [inf -inf];
+        
+        ax = ax2plot{axi};
+        
+        %% tf pulses
+        subplot(length(ax2plot), 3, 1 + (axi-1)*3); hold on;
+        
+        % Fast pulses
+        Rf = (proj.(ax).FexpF + proj.(ax).FexpS)/2;
+        Rf = utils.detrend_resp(Rf, isbetween(t_ax.tf, [-.5 -.2]), isbetween(t_ax.tf, [.7 1.2]));
+        Rf = utils.remove_baseline(Rf, isbetween(t_ax.tf, ops.respWin.tfContext));
+        plot(t_ax.tf, Rf, ...
+             'linewidth', 2, 'color', ops.colors.F)
+         
+        % slow pulses
+        Rs =  (proj.(ax).SexpF + proj.(ax).SexpS)/2;
+        Rs = utils.detrend_resp(Rs, isbetween(t_ax.tf, [-.5 -.2]), isbetween(t_ax.tf, [.7 1.2]));
+        Rs = utils.remove_baseline(Rs, isbetween(t_ax.tf, ops.respWin.tfContext));
+        plot(t_ax.tf, Rs, ...
+             'linewidth', 2, 'color', ops.colors.S)
+        xlim([-.25 1])
+        
+        yl = ylim;
+        ylmax = [min([yl(1), ylmax(1)]), max([yl(2), ylmax(2)])];
+        
+        %% changes
+        subplot(length(ax2plot), 3, 2 + (axi-1)*3); hold on;
+        
+        clrs = create_custom_colormap(ops.colors.S, [.5 .5 .5], ops.colors.F, 7);
+        
+        for chi = [1 2 3 5 6 7]
+           Rch = smoothdata(proj.(ax).(sprintf('hitE%d', chi)), 'movmean', 25);
+           Rch = utils.remove_baseline(Rch, isbetween(t_ax.ch, [-1 0]));
+           plot(t_ax.ch, Rch, 'linewidth', 1.5, 'color', clrs(chi,:));
         end
-        xlim(evs{jj,4}{1});
         
+        xlim([-.5 1])
+        yl = ylim;
+        ylmax = [min([yl(1), ylmax(1)]), max([yl(2), ylmax(2)])];
+        
+        
+        %% Hits
+        subplot(length(ax2plot), 3, 3 + (axi-1)*3); hold on;
+                
+        for chi = [1 2 3 4 5 6 7]
+           Rch = smoothdata(proj.(ax).(sprintf('hitLickE%d', chi)), 'movmean', 25);
+           Rch = utils.remove_baseline(Rch, isbetween(t_ax.hit, [-2 -1]));
+           plot(t_ax.hit, Rch, 'linewidth', 1.5, 'color', clrs(chi,:));
+        end
+        
+        xlim([-1 .5])
+        yl = ylim;
+        ylmax = [min([yl(1), ylmax(1)]), max([yl(2), ylmax(2)])];
+        
+        %% Scale by max ylim
+        
+        subplot(length(ax2plot), 3, 1 + (axi-1)*3); 
+        yl = ylim;
+        ylim(mean(yl) + [-1, 1] * range(ylmax/20));
+        
+        for ii = 2:3
+            subplot(length(ax2plot), 3, ii + (axi-1)*3);
+            ylim( ylmax);
+        end
     end
-
-end
-% keyboard
-
-%% 2D plots
-
-ax1 = axes{1};
-ax2 = axes{2};
-
-for ii = 1:size(evs,1)
-    subplot(4, size(evs,1), ii + [size(evs,1)*2 size(evs,1)*3]); cla;
-    for jj = 1:numel(evs{ii,1})
-        hold on
-        proj1 = smoothdata(proj.(ax1).(evs{ii,1}{jj}), 'movmean', evs{ii,8}{1});
-        proj1 = proj1(isbetween(t_ax.(evs{ii, 2}{1}), evs{ii,6}{1}));
-        proj2 = smoothdata(proj.(ax2).(evs{ii,1}{jj}), 'movmean', evs{ii,8}{1});
-        proj2 = proj2(isbetween(t_ax.(evs{ii, 2}{1}), evs{ii,6}{1}));
-        crop_t = t_ax.(evs{ii, 2}{1})(isbetween(t_ax.(evs{ii, 2}{1}), evs{ii,6}{1}));
-        
-        if isempty(evs{ii, 9})
-            plot(proj1, proj2, 'linewidth', 2, 'color', evs{ii, 3}{1}(jj,:))
-        else
-            cmap = evs{ii,9}{1};
-            for tt = 1:numel(crop_t)-1
-                plot(proj1(tt:tt+1), proj2(tt:tt+1), 'color', cmap(tt,:), 'linewidth', 2);
-            end
-        end
-        % scatter specified time points
-        if isempty(evs{ii, 7})
-            continue
-        end
-        tms = evs{ii, 7}{1};
-        for tt = 1:length(tms)
-            [~, tm] = min(abs(crop_t - tms(tt)));
-            proj1_tm = proj1(tm);
-            proj2_tm = proj2(tm);
-            scatter(proj1_tm, proj2_tm, 25, 'o', 'filled', ...
-                    'MarkerFaceColor', evs{ii, 3}{1}(jj,:))
-        end
-        
-        
-        % scatter zero point
-        [~, t0] = min(abs(crop_t));
-        proj1_t0 = proj1(t0);
-        proj2_t0 = proj2(t0);
-        if isempty(evs{ii, 9})
-            scatter(proj1_t0, proj2_t0, 75, 'o', 'filled', ...
-                    'MarkerFaceColor', evs{ii, 3}{1}(jj,:), 'MarkerEdgeColor', 'k')
-        else
-            continue
-        end
-        
-        
-        
-    end
-end
-%%
-% keyboard
-
+    
+    
 end
 
 
 
-
-
-
+end
