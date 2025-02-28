@@ -1,170 +1,140 @@
-function f = plot_glm_kernels(kernels, areas, ops)
+function f = plot_glm_kernels(beta_full, regressors, regressor_dims, dspec, ops, title_txt)
+% PLOT_GLM_KERNELS Visualize GLM kernels
 
-%% first sort by region
-%%
-% randomly shuffle initially
-kernels = kernels(randperm(height(kernels)),:);
+binSize = ops.tBin * 1000;  % in ms
+beta = beta_full(2:end);    % exclude intercept
 
-% sort by resp
-sig_tfe = kernels.TFbl_e_p < .025;
-sig_tfl = kernels.TFbl_l_p < .025;
+f=figure( 'Units', 'centimeters', 'Position', [10 10 25 20]);
 
-tf_kern_e = cell2mat(kernels.TFbl_e')';
-tf_kern_e = mean(tf_kern_e(:,3:13),2)-nanmean(tf_kern_e(:,1:3),2); %0-750ms
-tf_kern_l = cell2mat(kernels.TFbl_l')';
-tf_kern_l = mean(tf_kern_l(:,3:13),2)-nanmean(tf_kern_l(:,1:3),2); %0-750ms
+%% 1. Baseline TF (fast and slow)
+subplot(2,3,1); hold on;
+plot_kernel(beta, regressors, regressor_dims, dspec, 'TFbl_f', [204 37 41]./255, 'Fast', binSize);
+plot_kernel(beta, regressors, regressor_dims, dspec, 'TFbl_s', [57 106 177]./255, 'Slow', binSize);
+xlabel('Time from stim (ms)');
+ylabel('Weight');
+title('Baseline TF kernels');
+xline(0, 'k--');
+% legend('Location', 'best');
 
-% sort by peak time
-kern_e = smoothdata(cell2mat(kernels.TFbl_e')', 'movmean',[3 0]);
+%% 2. Peri-lick
+subplot(2,3,2); hold on;
+el=cbrewer2('div', 'PuOr', 2);
 
-[~,peak]  = max(abs(kern_e(:,3:12) - mean(kern_e,2)),[],2);
-[~,order] = sort(peak, 'ascend');
-
-% get resp mag/sign
-resp_mag = (tf_kern_e + tf_kern_l)/2;
-[resp_mag, order] = sort(sign(resp_mag), 'descend');
-
-kernels = kernels(order,:);
-kernels.resp_mag_e = tf_kern_e(order);
-kernels.resp_mag_l = tf_kern_l(order);
-kernels.resp_mag   = resp_mag;
-
-tf_resp_kernels = kernels(kernels.tf_p<.05 |( kernels.TFbl_e_p<.05 & kernels.TFbl_e_p<.05), :);
-
-% sort by loc
-locs = tf_resp_kernels.loc;
-units_by_loc = [];
-n_per_loc = [];
-for r = 1:length(areas)
-    this_roi_areas = areas{r};
-
-    in_area = contains(locs, this_roi_areas);
-    units_by_loc = vertcat(units_by_loc, sort(find(in_area)));
-    n_per_loc(end+1) = sum(in_area);
+if ops.splitELlick
+    plot_kernel(beta, regressors, regressor_dims, dspec, 'PreLick_e',el(1,:), '', binSize);
+    plot_kernel(beta, regressors, regressor_dims, dspec, 'Lick_e', el(1,:), 'Early', binSize);
+    plot_kernel(beta, regressors, regressor_dims, dspec, 'PreLick_e',el(2,:), '', binSize);
+    plot_kernel(beta, regressors, regressor_dims, dspec, 'Lick_e', el(2,:), 'Late', binSize);
+else
+    plot_kernel(beta, regressors, regressor_dims, dspec, 'PreLick', [.5 .5 .5], 'PreLick', binSize);
+    plot_kernel(beta, regressors, regressor_dims, dspec, 'Lick', 'k', 'Lick', binSize);
 end
-n_per_loc = cumsum(n_per_loc);
-n_per_loc = [0, n_per_loc];
-% sort again
-tf_resp_kernels = tf_resp_kernels(units_by_loc,:);
+xlabel('Time from lick (ms)');
+ylabel('Weight');
+title('Peri-lick kernel');
+xline(0, 'k--');
+% legend('Location', 'best');
 
-%% plot TF, baseline, lick kernels for tf sensitive
+%% 3. Baseline (onset and long)
+subplot(2,3,3); hold on;
+yyaxis left
+plot_kernel(beta, regressors, regressor_dims, dspec, 'baselineOnset', 'k', 'Onset', binSize);
+ylabel('Onset weight');
+bl_long_id = find(strcmp({dspec.covar.label}, 'baseline'));
+dspec.covar(bl_long_id).offset = 200;
+yyaxis right
+plot_kernel(beta, regressors, regressor_dims, dspec, 'baseline', [.5 .5 .5], 'Long', binSize);
+ylabel('Long baseline weight');
+xlabel('Time from trial start (ms)');
+title('Baseline kernels');
+% legend('Location', 'best');
 
-f = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .1 .4]);
+%% 4. TFch kernels
+ch_cols = RedGreyBlue(7);
+subplot(2,3,4); hold on;
+tfch_names = {'TFch_25', 'TFch_100', 'TFch_150', 'TFch_200', 'TFch_250', 'TFch_300', 'TFch_375'};
+tfch_labels = {'0.25', '1', '1.5', '2', '2.5', '3', '3.75'};
+colors = lines(length(tfch_names));
+for i = 1:length(tfch_names)
+    plot_kernel(beta, regressors, regressor_dims, dspec, tfch_names{i}, ch_cols(i,:), tfch_labels{i}, binSize);
+end
+xlabel('Time from change (ms)');
+ylabel('Weight');
+title('TF change kernels');
+xline(0, 'k--');
+% legend('Location', 'best');
 
-% tf resps
-subplot(1,2,1); hold on
+%% 5. Outcome (bar plot)
+subplot(2,3,5); hold on;
+outcome_names = {'outcome_Miss', 'outcome_Hit', 'outcome_FA', 'outcome_abort'};
+outcome_labels = {'Miss', 'Hit', 'FA', 'Abort'};
+beta_outcome = zeros(length(outcome_names), 1);
+for i = 1:length(outcome_names)
+    idx = find(strcmp(regressors, outcome_names{i}));
+    if ~isempty(idx)
+        beta_outcome(i) = mean(beta(regressor_dims{idx}));
+    end
+end
+bar(1:4, beta_outcome);
+set(gca, 'XTick', 1:4, 'XTickLabel', outcome_labels);
+ylabel('Weight');
+title('Outcome kernels');
 
-% choices = randi(2, size(X,1),1);
+%% 6. Motion energy
+subplot(2,3,6); hold on;
+plot_kernel(beta, regressors, regressor_dims, dspec, 'motionEnergy', 'c', 'MotE', binSize);
+xlabel('Time (ms)');
+ylabel('Weight');
+title('Motion energy kernel');
+xline(0, 'k--');
 
-X = cell2mat(tf_resp_kernels.TFbl_e')';
-% X = X(:,sub2ind(size(X), 1:size(X,1) , 1:size(X,2), choices))
+sgtitle(title_txt, 'interpreter', 'none');
 
-% X = X./nanstd(X,[],2);
+end
 
-X_locSep = [];
-for ii = 1:length(n_per_loc)-1
-    this_loc_X = smoothdata(X(n_per_loc(ii)+1:n_per_loc(ii+1),:), 2, 'movmean', [2 1]);
-    X_locSep = [X_locSep; ...
-                this_loc_X; ...
-                zeros(5, size(X,2))];
+function plot_kernel(beta, regressors, regressor_dims, dspec, name, color, label, binSize)
+    % Find regressor index
+    idx = find(strcmp(regressors, name));
+    if isempty(idx)
+        return;
+    end
     
-end
-X = X_locSep;
-X = (X-nanmean(X,2))./nanstd(X,[],2);
-
-imAlpha = ones(size(X));
-imAlpha(isnan(X)) = 0;
-h=imagesc(X(:,[1:end]), 'alphadata', imAlpha(:,[1:end]));
-
-h.XData = [-.15:.05:2];
-line([0 0], [0 size(X,1)], 'color', [.4 .4 .4])
-caxis([-1.5 1.5]) 
-xlim([-.1 1.5])
-colormap(RedWhiteBlue)
-xticks([0 1])
-xticklabels([0 1])
-ax = gca;
-set(ax, 'YDir', 'reverse', 'box', 'off')
-ax.YAxis.Visible = 'off';
-ylim([0 size(X,1)+1])
-
-% tf resps
-subplot(1,2,2)
-
-X = cell2mat(tf_resp_kernels.TFbl_l')';
-% X = X./nanstd(X(:,20:30),[],2);
-
-X_locSep = [];
-for ii = 1:length(n_per_loc)-1
-    this_loc_X = smoothdata(X(n_per_loc(ii)+1:n_per_loc(ii+1),:), 2, 'movmean', [2 1]);
-    X_locSep = [X_locSep; ...
-                this_loc_X; ...
-                zeros(5, size(X,2))];
+    % Find in dspec
+    dspec_idx = find(strcmp({dspec.covar.label}, name));
+    if isempty(dspec_idx)
+        return;
+    end
     
-end
-X = X_locSep;
+    % Get coefficients
+    beta_k    = beta(regressor_dims{idx});
+    
+    % Get offset and duration from dspec
+    covar = dspec.covar(dspec_idx);
+    
+    if isfield(covar, 'offset') && ~isempty(covar.offset)
+        offset_bins = covar.offset;
+    else
+        offset_bins = 0;
+    end
+    
+    % Duration from basis
+    if isfield(covar, 'basis') && ~isempty(covar.basis)
+        duration_bins = size(covar.basis.B, 1);
+    else
+        duration_bins = length(beta_k);
+    end
+    
+    % Convert to ms
+    offset_ms = offset_bins * binSize;
+    duration_ms = duration_bins * binSize;
 
-
-X = (X-nanmean(X,2))./nanstd(X,[],2);
-
-imAlpha = ones(size(X));
-imAlpha(isnan(X)) = 0;
-h=imagesc(-X(:,2:end), 'alphadata', imAlpha(:,2:end));
-h.XData = [-.1:.05:2];
-line([0 0], [0 size(X,1)], 'color', [.4 .4 .4])
-caxis([-1.5 1.5]) 
-xlim([-.1 1.5])
-colormap(RedWhiteBlue)
-ax = gca;
-set(ax, 'YDir', 'reverse', 'box', 'off')
-ax.YAxis.Visible = 'off';
-ylim([0 size(X,1)+1])
-xticks([0 1])
-xticklabels([0 1])
-
-% 
-% 
-% % baseline
-% 
-% subplot(1,3,2)
-% 
-% X = [cell2mat(tf_resp_kernels.baselineOnset')', cell2mat(tf_resp_kernels.baseline')'];
-% X_locSep = [];
-% X = X./nanstd(X,[],2);
-% 
-% for ii = 1:length(n_per_loc)-1
-%     this_loc_X = smoothdata(X(n_per_loc(ii)+1:n_per_loc(ii+1),:), 2, 'movmean', [3 0]);
-%     X_locSep = [X_locSep; ...
-%                 this_loc_X; ...
-%                 zeros(5, size(X,2))];
-%     
-% end
-% X = X_locSep;
-% imagesc(X)
-% caxis([-1 1])
-% xlim([0 30])
-% colormap(RedWhiteBlue)
-% 
-% % lick
-% 
-% subplot(1,2,2)
-% 
-% X = cell2mat(tf_resp_kernels.Lick')';
-% % X = X./nanstd(X,[],2);
-% 
-% X_locSep = [];
-% for ii = 1:length(n_per_loc)-1
-%     this_loc_X = smoothdata(X(n_per_loc(ii)+1:n_per_loc(ii+1),:), 2, 'movmean', [3 0]);
-%     X_locSep = [X_locSep; ...
-%                 this_loc_X; ...
-%                 zeros(5, size(X,2))];
-%     
-% end
-% X = X_locSep;
-% 
-% imagesc(X)
-% caxis([-.5 .5])
-% xlim([size(X,2)-20, size(X,2)])
-% colormap(RedWhiteBlue)
-
+    % modify smoothing depending on resolution
+    res = duration_ms/numel(beta_k);
+    
+    beta_k_sm = smoothdata(beta_k, 'movmean', max(2, 50/res));
+    
+    % Time axis
+    t = linspace(offset_ms, offset_ms + duration_ms, length(beta_k));
+    plot(t, beta_k, '.', 'Color', color, 'HandleVisibility', 'off')
+    plot(t, beta_k_sm, '-', 'LineWidth', 1, 'Color', color, 'DisplayName', label);
 end

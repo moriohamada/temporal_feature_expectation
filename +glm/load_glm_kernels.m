@@ -1,8 +1,8 @@
-function kernels = collate_glm_fits_v2(neuron_info, ops, type)
+function kernels = load_glm_kernels(neuron_info, ops, type)
 % 
-% Return kernels and p values for every %unit fitted with GLM
+% Return kernels and p values for every unit fitted with GLM
 %%
-fprintf('\nLoading all glm kernel fits. This will take a moment...\n')
+% fprintf('\nLoading all glm kernel fits. This will take a moment...')
 nN = height(neuron_info);
 kernels = table;
 
@@ -11,12 +11,15 @@ switch type
         glm_dir = ops.fullGLMDir;
     case 'EL'
         glm_dir = ops.glmELDir;
+    case 'tdr'
+        glm_dir = ops.tdrGLMDir;
     otherwise
         keyboard
 end
 
 if exist(fullfile(glm_dir, 'all_su_kernels.mat'), 'file')
     kernels = loadVariable(fullfile(glm_dir, 'all_su_kernels.mat'), 'kernels');
+ 
 else
 
 ii = 0;
@@ -28,11 +31,7 @@ for n = 1:nN
    if ~exist(fullfile(glm_dir, animal, session), 'dir')
        continue
    end
-   
-%    if neuron_info{n,'cg'} == 1
-%        continue
-%    end
-   
+    
    % load glm fit data
    cid = neuron_info{n, 'cid'};
    res_files = dir2(fullfile(glm_dir, animal, session));
@@ -69,17 +68,14 @@ for n = 1:nN
    unit_kernels.time_p     = fit_info.p_corr_refit_active(2);
    unit_kernels.premotor_p = fit_info.p_corr_refit_active(3);
    
-%    keyboard
-   
+    
    % append to kernels
    kernels = vertcat(kernels, struct2table(unit_kernels, 'AsArray', true));
-%     kernels(n) = struct2table(unit_kernels, 'AsArray', true);
-  
+   
 end
 
 % save 
-save(fullfile(glm_dir, 'all_su_kernels.mat'), 'kernels', '-v7.3')
-fprintf('done.\n')
+save(fullfile(glm_dir, 'all_su_kernels.mat'), 'kernels', '-v7.3') 
 
 end
 

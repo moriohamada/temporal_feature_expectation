@@ -1,30 +1,42 @@
-function fit_full_glm_hpc(n)
+function fit_glm_main(n)
+% Main function to fit glms to a single unit.
 % 
-% Fit full glm on hpc. For this function, features should already have been extracted using
-% prep_Xdm_yfr_by_unit_for_glm.m.
+% The whole GLM pipeline consists of:
+% 1) prepare design matrices (X)
+% 2) extract spike times (y)
+% 3) run fits 
 % 
-% --------------------------------------------------------------------------------------------------
+% Steps 1 and 2 are be done elsewhere (see prep Xy_for_glm.m). 
+% 
+% INPUT:
+%   n - int - unit number to fit (across all recordings)
+
 %%
+
+
 [~, name] = system('hostname');
 name = name(1:5);
 if strcmp(name, 'earth')
 addpath(genpath('/home/morio/Documents/MATLAB/General'));
-addpath(genpath('/home/morio/Documents/MATLAB/switch-task/Analysis_pipeline'));
+addpath(genpath('/home/morio/Documents/MATLAB/switch-task/final_pipeline'));
 else
 addpath(genpath('/nfs/nhome/live/morioh/Documents/MATLAB/General'));
-addpath(genpath('/nfs/nhome/live/morioh/Documents/MATLAB/switch-task/Analysis_pipeline'));
+addpath(genpath('/nfs/nhome/live/morioh/Documents/MATLAB/switch-task/final_pipeline'));
 end
-%%
+
 if strcmp(name, 'earth')
-paths.dataDir = '/mnt/ceph/public/projects/MoHa_20240218_SwitchChangeDetect_spForGLM/';
-paths.saveDir = '/mnt/ceph/public/projects/MoHa_20240218_SwitchChangeDetect_spForGLM/';
+paths.dataDir = '/mnt/ceph/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/';
+paths.saveDir = '/mnt/ceph/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/results';
 else
-paths.dataDir = '/ceph/mrsic_flogel/public/projects/MoHa_20240218_SwitchChangeDetect_spForGLM/';
-paths.saveDir = '/ceph/mrsic_flogel/public/projects/MoHa_20240218_SwitchChangeDetect_spForGLM/ridge';
+paths.dataDir = '/ceph/mrsic_flogel/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/';
+paths.saveDir = '/ceph/mrsic_flogel/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/FS10ms_50msKernels';
 end
 
 
-%% Load in data
+
+%% Load DM and spike data
+
+glm_ops = glm.set_glm_ops();
 
 spFiles = dir2(fullfile(paths.dataDir,'spikeTimes'));
 spFile  = spFiles{n};
@@ -34,71 +46,69 @@ clear spFiles
 st = loadVariable(fullfile(paths.dataDir, 'spikeTimes', spFile), 'st');
 if length(st)/range(st) < .25
     fprintf('\nFR too low for GLM fitting - skipping unit!')
-    if strcmp(name, 'earth')
-        return
-    else
-        exit
-    end
+    return
 end
 % load DM
 animal  = spFile(1:6);
 session = spFile(8:9);
 cid     = spFile(11:15);
 fprintf('Fitting glm for %s %s %s\n', animal, session, cid);
-[features, trStarts, ops] = loadVariables(fullfile(paths.dataDir, 'features', sprintf('%s_%s.mat', animal, session)), ...
-                                          'features', 'trStarts','ops');
 
-%% Further ops for fitting
-ops.nlambdas   = 10;
-ops.kFold      = 10;
-ops.maxIter    = 1000;
-ops.tol        = .01;
-ops.nlambdas   = 100;
-ops.smoothPred = 5;
+% also save trial outcomes, start
+if ~glm_ops.splitELtf && ~glm_ops.splitFStf
+    features_name = 'featuresFull10ms';
+elseif ~glm_ops.splitELtf && glm_ops.splitFStf
+    features_name = 'featuresFSsplit10ms';
+elseif glm_ops.splitELtf && ~glm_ops.splitFStf
+    features_name = 'featuresELsplit10ms';
+else
+    features_name = 'featuresFSELsplit10ms';
+end
+
+[features, trStarts] = loadVariables(fullfile(paths.dataDir, features_name, sprintf('%s_%s.mat', animal, session)), ...
+                                          'features', 'trStarts');
+
+
+%%
+% Further options for fitting
+glm_ops.nlambdas    = 10;
+glm_ops.kFold       = 10;
+glm_ops.maxit       = 1e4;
+glm_ops.thresh      = 1e-4;
+glm_ops.nlambdas    = 10;
+glm_ops.smoothPred  = 5;
+glm_ops.addBias     = true;
 
 %% Create DM and y vector
 params.animal  = animal;
 params.session = session;
 params.cid     = cid;
-features_n = add_st_to_glm_features_v2(features, trStarts, st, ops);
-[expt, dspec] = get_expt_dspec_for_glm(features_n, params, ops);
+features = glm.one_hot_changes(features); 
+features = glm.one_hot_outcomes(features);
+features = glm.add_stimON(features);
+features_n = glm.add_st_to_glm_features(features, trStarts, st, glm_ops);
 
-%%
-
-% % get cross val inds
-xval_inds = crossvalind('Kfold',length(features_n),ops.kFold);
-
-corrs = nan(ops.kFold, ops.nlambdas);
-rmses = nan(ops.kFold, ops.nlambdas);
-xval_ws = zeros(ops.kFold, dspec.edim+1, ops.nlambdas);
-
-% set glmnet options
-clear options
-options.alpha = 0;
-options.nlambda = ops.nlambdas;
-options.standardize = false;
-options.nfolds = ops.kFold;
-options = glmnetSet(options);
-
-
-%%
-fprintf('Building design matrix...\t')
+[expt, dspec] = glm.get_expt_dspec_for_glm(features_n, params, glm_ops);
 
 [dm, trialIDs] = buildGLM.compileSparseDesignMatrixWithTrialInd(dspec, 1:length(features_n));
-dm = buildGLM.addBiasColumn(dm);
+
+if glm_ops.addBias
+    dm = buildGLM.addBiasColumn(dm);
+end
 y = buildGLM.getBinnedSpikeTrain(expt, 'SpTrain', dm.trialIndices);
+
 
 %%
 % set motE and treadmill around licks to 0
 regressors = {dspec.covar.label};
 edims = [dspec.covar.edim];
-dim_ids = [0,  cumsum(edims)] + 1; % add one for offset
+dim_ids = [0,  cumsum(edims)] + glm_ops.addBias; % add one for offset
 lick_dims =  find(contains(regressors, 'Lick'));
-lick_regressor_IDs = [];
+regressor_IDs = [];
 for ii = 1:length(lick_dims)
-    lick_regressor_IDs = [lick_regressor_IDs, dim_ids(lick_dims(ii))+1:(dim_ids(lick_dims(ii)+1))];
+    regressor_IDs = [regressor_IDs, dim_ids(lick_dims(ii))+1:(dim_ids(lick_dims(ii)+1))];
 end
-lick_active = sum(dm.X(:,lick_regressor_IDs),2)>0;
+lick_active = sum(dm.X(:,regressor_IDs),2)>0;
 
 move_dims =  find(strcmp(regressors, 'motionEnergy') | strcmp(regressors, 'runSpeed'));
 move_regressor_IDs = [];
@@ -106,7 +116,16 @@ for ii = 1:length(move_dims)
     move_regressor_IDs = [move_regressor_IDs, dim_ids(move_dims(ii))+1:(dim_ids(move_dims(ii)+1))];
 end
 dm.X(lick_active,move_regressor_IDs) = 0;
-%%
+
+%% 
+
+% % get cross val inds
+xval_inds = crossvalind('Kfold',length(features_n),glm_ops.kFold);
+
+corrs = nan(glm_ops.kFold, glm_ops.nlambdas);
+rmses = nan(glm_ops.kFold, glm_ops.nlambdas);
+xval_ws = zeros(glm_ops.kFold, dspec.edim+1, glm_ops.nlambdas);
+
 % get fold IDs
 foldIDs = zeros(size(trialIDs));
 trialNums = 1:length(features_n);
@@ -115,30 +134,48 @@ for tr = trialNums
     this_tr_rows = trialIDs == tr;
     foldIDs(this_tr_rows) = this_tr_fold;
 end
-fprintf('done.\n')
-
+ 
 %% Find best lambda
+clear options
+options.alpha = 1;
+options.nlambda = glm_ops.nlambdas;
+options.standardize = false;
+options.nfolds = glm_ops.kFold;
+options.maxit = glm_ops.maxit;
+options.thresh = glm_ops.thresh;
+options.lambda = logspace(-4, 0, 9);
+options.intr=false;
+options = glmnetSet(options);
+
+
 fprintf('Fitting models...\t')
 tic
-CVinfo = cvglmnet(dm.X, y,'poisson', options, 'deviance',ops.kFold, foldIDs, true);
+CVinfo = cvglmnet(dm.X, y, 'poisson', options, 'deviance',glm_ops.kFold, foldIDs, true);
 fprintf('done.\n')
 toc
 
 %% Predict from best lambda
-fprintf('Predicting on cross-validated data...\t')
+fprintf('Predicting on cross-validated data...\n')
 best_lambda = CVinfo.lambda_min;
+fprintf('Best lambda: %.4f\n', best_lambda)
 best_lambda_idx = find(CVinfo.lambda==best_lambda);
-w = CVinfo.glmnet_fit.beta(:,best_lambda_idx);
-xval_corrs = zeros(1,ops.kFold);
-for k = 1:ops.kFold
+xval_corrs = zeros(1,glm_ops.kFold);
+for k = 1:glm_ops.kFold
     this_fold_x = dm.X(foldIDs==k,:);
     this_fold_y = y(foldIDs==k);
 
     y_pred = glmnetPredict(CVinfo.glmnet_fit, this_fold_x, best_lambda, 'response');
-    xval_corrs(k) = corr(smoothdata(this_fold_y,'movmean',ops.smoothPred),...
-                         smoothdata(y_pred,'movmean',ops.smoothPred));
+    xval_corrs(k) = corr(smoothdata(this_fold_y,'movmean',glm_ops.smoothPred),...
+                         smoothdata(y_pred,'movmean',glm_ops.smoothPred), ...
+                         'Rows','complete');
 end
 fprintf('done.\n')
+
+fprintf('\nMean xval correlations: %.3f\n', mean(xval_corrs))
+% if mean(xval_corrs) < .01
+%     fprintf('GLM fit too poor! skipping unit...\n')
+%     return
+% end
 
 %% Find indexes corresponding to regressors
 
@@ -146,152 +183,106 @@ fprintf('done.\n')
 regressors = {dspec.covar.label};
 
 edims = [dspec.covar.edim];
-dim_ids = [0,  cumsum(edims)] + 1; % add one for offset
+dim_ids = [0,  cumsum(edims)] + glm_ops.addBias; % add one for offset
 clear regressor_dims;
 for r = 1:length(regressors)
     regressor_dims{r} = dim_ids(r)+1:dim_ids(r+1);
 end
 
-% Get some correlated regressors 
-% baseline TF
-tf_dims = find(contains(regressors, 'TFbl') | contains(regressors, 'Phase'));
-regressors{end+1} = 'TFbl_all';
-lick_regressor_IDs = [];
-for ii = 1:length(tf_dims)
-    lick_regressor_IDs = [lick_regressor_IDs, dim_ids(tf_dims(ii))+1:(dim_ids(tf_dims(ii)+1))];
-end
-regressor_dims{end+1} = lick_regressor_IDs;
+%% Lesion (circshift) regressors and refit with fixed lambda
+% Get full model coefficients
+beta_full = cvglmnetCoef(CVinfo, 'lambda_min'); 
+best_lambda = CVinfo.lambda_min;
 
-% Phases
-phase_dims = find(contains(regressors, 'Phase'));
-regressors{end+1} = 'Phases_all';
-lick_regressor_IDs = [];
-for ii = 1:length(phase_dims)
-    lick_regressor_IDs = [lick_regressor_IDs, dim_ids(tf_dims(ii))+1:(dim_ids(tf_dims(ii)+1))];
-end
-regressor_dims{end+1} = lick_regressor_IDs;
+lesion_groups = {
+    'TFbl',      find(contains(regressors, 'TFbl'));
+    'TFch',      find(contains(regressors, 'TFch'));
+    'PreLick',   find(contains(regressors, 'PreLick'));
+    'Lick',      find(strcmp(regressors, 'Lick'));
+    'baseline',  find(strcmp(regressors, 'baseline'));
+    'all',       find(contains(regressors, 'Lick')|contains(regressors, 'TF'));
+};
 
-% Pre lick
-lick_dims =  find(contains(regressors, 'PreLick') & ~contains(regressors, '_all'));
-               
-regressors{end+1} = 'Premotor';
-lick_regressor_IDs = [];
-for ii = 1:length(lick_dims)
-    lick_regressor_IDs = [lick_regressor_IDs, dim_ids(lick_dims(ii))+1:(dim_ids(lick_dims(ii)+1))];
-end
-regressor_dims{end+1} = lick_regressor_IDs;
+n_folds = max(foldIDs);
+n_groups = size(lesion_groups, 1);
+n_perms = 20;
+lesion_results = struct();
 
+options_fixed = options;
+options_fixed.lambda = best_lambda;
 
-% All movement
-move_dims =  find((contains(regressors, 'Lick') | ...
-                   strcmp(regressors, 'motionEnergy') | strcmp(regressors, 'runSpeed')) ...
-                   & ~contains(regressors, '_all'));
-               
-regressors{end+1} = 'Movement';
-lick_regressor_IDs = [];
-for ii = 1:length(move_dims)
-    lick_regressor_IDs = [lick_regressor_IDs, dim_ids(move_dims(ii))+1:(dim_ids(move_dims(ii)+1))];
-end
-regressor_dims{end+1} = lick_regressor_IDs;
-
-% All
-regressors{end+1} = 'All';
-regressor_dims{end+1} = 2:dim_ids(end);
-
-%% Lesion regressors in sequence to test significance
-fprintf('Fitting lesioned models...\n')
-tic
-corrs_lesioned = nan(length(regressors), ops.kFold); % full data correlation after lesioning
-corrs_active = nan(length(regressors), ops.kFold); % correlation when regressor is active
-corrs_active_lesioned = nan(length(regressors), ops.kFold); % correlation when regressor active, lesioned
-
-for r = 1:length(regressors)
-    regressor = regressors{r};
-    fprintf('\tregressor %d/%d: %s\n', r, length(regressors), regressor);
-    if contains(regressor,'Phase') & ~strcmp(regressor, 'Phase_all')
-        continue
+for g = 1:n_groups
+    group_name = lesion_groups{g, 1};
+    group_regs = lesion_groups{g, 2};
+    
+    cols_to_shuffle = [];
+    for r = group_regs
+        cols_to_shuffle = [cols_to_shuffle, regressor_dims{r}];
     end
+    
+    % Find rows where any of these columns are non-zero
+    active_rows = any(dm.X(:, cols_to_shuffle) ~= 0, 2);
+    
+    fprintf('Testing %s:...\n', group_name);
+    
+    corr_full_folds = zeros(n_folds, 1);
+    corr_shifted_folds = zeros(n_folds, n_perms);
+    
+    for f = 1:n_folds
+        test_idx = foldIDs == f;
+        test_idx_active = test_idx & active_rows;  % Only active periods in this fold
         
-    fit_lesioned = CVinfo.glmnet_fit;
-    
-    % set this regressor weights to zero
-    w_lesioned = w;
-    dims = regressor_dims{r};
-    w_lesioned(dims)=0;
-    
-    fit_lesioned.beta(:,best_lambda_idx) = w_lesioned;
-    
-    parfor k = 1:ops.kFold
-        this_fold_x = dm.X(foldIDs==k,:);
-        this_fold_y = y(foldIDs==k);
-        y_pred = glmnetPredict(fit_lesioned, this_fold_x, best_lambda, 'response');
-        corrs_lesioned(r,k) = corr(smoothdata(this_fold_y,'movmean',ops.smoothPred), ...
-                                   smoothdata(y_pred,'movmean',ops.smoothPred));
-                               
-        % find regressor-active periods
-        active_times = sum(this_fold_x(:,dims),2)~=0;
-        if sum(active_times)==0
-            continue
+        y_test = y(test_idx_active);
+        X_test = dm.X(test_idx_active, :);
+        
+        % Predict on UNSHIFTED test data
+        y_pred_full = glmnetPredict(CVinfo.glmnet_fit, X_test, best_lambda, 'response');
+        
+        % Smooth predictions and actual for correlation
+        y_test_smooth = smoothdata(y_test, 'movmean', glm_ops.smoothPred);
+        y_pred_full_smooth = smoothdata(y_pred_full, 'movmean', glm_ops.smoothPred);
+        corr_full_folds(f) = corr(y_test_smooth, y_pred_full_smooth, 'rows','complete');
+        
+        % Test with circular shifts
+        parfor p = 1:n_perms
+            X_test_shifted = X_test;
+            min_shift_bins = round(.5 / glm_ops.tBin);  % 1 second minimum
+            shift = randi([min_shift_bins, round(size(X_test, 1) - min_shift_bins)]);
+            X_test_shifted(:, cols_to_shuffle) = circshift(X_test(:, cols_to_shuffle), shift, 1);
+            
+            % Predict on SHIFTED test data
+            y_pred_shifted = glmnetPredict(CVinfo.glmnet_fit, X_test_shifted, best_lambda, 'response');
+            y_pred_shifted_smooth = smoothdata(y_pred_shifted, 'movmean', glm_ops.smoothPred);
+            corr_shifted_folds(f, p) = corr(y_test_smooth, y_pred_shifted_smooth, 'rows','complete');
         end
-        y_pred_active = glmnetPredict(CVinfo.glmnet_fit, this_fold_x(active_times,:), best_lambda, 'response');
-        y_pred_active_lesioned = glmnetPredict(fit_lesioned, this_fold_x(active_times,:), best_lambda, 'response');
-        corrs_active(r,k) = corr(smoothdata(this_fold_y(active_times), 'movmean', ops.smoothPred), ...
-                                 smoothdata(y_pred_active, 'movmean', ops.smoothPred));
-        corrs_active_lesioned(r,k) = corr(smoothdata(this_fold_y(active_times), 'movmean', ops.smoothPred), ...
-                                          smoothdata(y_pred_active_lesioned, 'movmean', ops.smoothPred));               
     end
     
-end
-toc
-fprintf('done.\n')
-
-%% Calculate significance and visualize kernels
-p_corr = ones(length(regressors),1);
-p_corr_active = ones(length(regressors),1);
-
-for r = 1:length(regressors)
-    regressor = regressors{r};
-    [~,p_corr(r)] = ttest(xval_corrs - corrs_lesioned(r,:));
-    [~,p_corr_active(r)] = ttest(corrs_active(r,:) - corrs_active_lesioned(r,:));
-end
-
-p_plot = p_corr_active;
-
-f_kernels= figure('Units', 'normalized', 'OuterPosition', [.1 .1 .15 .45],'visible','on');
-hold on
-nCovar = length(regressors)-5;
-n_phase = sum(contains(regressors,'Phase'));
-% plot all except phases
-ii = 0;
-for kCov = 1:nCovar
-    label = regressors{kCov};
-    if contains(label, 'Phase')
-        continue;
-    else
-        ii=ii+1;
-    end
+    % Average correlation across permutations
+    mean_corr_shifted_per_fold = nanmean(corr_shifted_folds, 2);
     
-    subplot(ceil((nCovar-n_phase)/2)+1, 2, ii)
-    hold on
+    % Paired t-test: is full correlation greater than shifted?
+    [~, p_value, ~, stats] = ttest(corr_full_folds, mean_corr_shifted_per_fold, 'Tail', 'right');
     
-    this_covar_dims = regressor_dims{kCov};
-    if length(this_covar_dims)==1
-        scatter(0, w(this_covar_dims), 50, 'x');
-        %ylim(ws(this_covar_dims)*[.99 1.01])
-        yticks(ws(this_covar_dims));
-        set(gca, 'Xcolor', 'none')
-    else
-        plot(dspec.covar(kCov).basis.centers * ops.tBin, smoothdata(w(this_covar_dims), 'movmedian', 3));
-    end
-    title(sprintf('%s, p = %.3f',label, p_plot(kCov)), 'FontSize', 8, 'FontWeight', 'normal');
+    % Store results
+    lesion_results.(group_name).corr_full_mean = nanmean(corr_full_folds);
+    lesion_results.(group_name).corr_shifted_mean = nanmean(mean_corr_shifted_per_fold);
+    lesion_results.(group_name).delta_corr = mean(corr_full_folds - mean_corr_shifted_per_fold);
+    lesion_results.(group_name).p = p_value;
+    lesion_results.(group_name).t_stat = stats.tstat;
+    lesion_results.(group_name).n_active = sum(full(active_rows));
+    
+    fprintf('\tcorr_full = %.4f, corr_shifted = %.4f, delta = %.4f, p = %.4f (n=%d)\n', ...
+        lesion_results.(group_name).corr_full_mean, ...
+        lesion_results.(group_name).corr_shifted_mean, ...
+        lesion_results.(group_name).delta_corr, p_value, ...
+        lesion_results.(group_name).n_active);
 end
-ii=ii+1;
-subplot(ceil((nCovar-n_phase)/2)+1, 2, ii)
-title(sprintf('TF=%.3f, preL=%.3f', p_plot(nCovar+1), p_plot(nCovar+3)), 'FontSize', 8, 'FontWeight', 'normal');
+%%
+f_kernels = glm.plot_glm_kernels(beta_full, regressors, regressor_dims, dspec, glm_ops, ...
+                                 sprintf('%s %s, cid: %s', animal, session, cid));
 
-%% Save data
-
-save_folder = fullfile(paths.saveDir,'ridge', animal, session);
+%% save results and figure
+save_folder = fullfile(paths.saveDir,'splitFS', animal, session);
 if ~exist(save_folder, 'dir')
     mkdir(save_folder);
 end
@@ -299,28 +290,24 @@ if ~exist(fullfile(save_folder, 'kernel_plots'), 'dir')
     mkdir(fullfile(save_folder, 'kernel_plots'));
 end
 
-% save data
+
 
 save(fullfile(save_folder, sprintf('cid%s.mat',cid)), ...
-     'ops', 'options', ...
-     'w', 'regressors', 'regressor_dims', ...
-     'xval_corrs', 'corrs_active', 'corrs_lesioned' ,'corrs_active_lesioned', ...
-     'p_corr', 'p_corr_active')
+     'glm_ops', 'options', ...
+     'beta_full', 'regressors', 'regressor_dims', ...
+     'xval_corrs', 'CVinfo', ...
+     'lesion_results', 'dspec')
  
 saveas(f_kernels, fullfile(save_folder, 'kernel_plots', cid), 'png')
 
-fprintf('\nGLM successfully fit!\n')
-toc
-if ~strcmp(name, 'earth')
-exit
+fprintf('\n ---GLM fit and successfully saved! ---\n')
+
+close(f_kernels)
 end
 
 
+function dev = poisson_deviance(y, mu)
+    % Poisson deviance
+    mu = max(mu, 1e-10);
+    dev = 2 * sum(y .* log((y + 1e-10) ./ mu) - (y - mu));
 end
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-function tf_values = get_each_timebin_tf(tf_vector, frame_times, delayed, tr_start, tr_end, bin_size)
+function tf_values = get_each_timebin_tf(tf_vector, frame_times, tr_start, tr_end, bin_size)
 
 % duration    = ceil((tr_end - tr_start)/bin_size); % convert frame times
 % tf_vector   = tf_vector(tf_vector~=0); % remove grey screen periods
