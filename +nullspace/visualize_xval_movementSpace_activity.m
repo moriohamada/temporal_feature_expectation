@@ -8,7 +8,7 @@ nIter = length(projs_iters);
 
 %% 1D plots
 
-f1 = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .3 .3]);
+f1 = figure('Units', 'normalized', 'OuterPosition', [.1 .1 .2 .3]);
 
 for ax_i = 1:length(dim_names)
     dim_name = dim_names{ax_i};
@@ -45,7 +45,7 @@ for ax_i = 1:length(dim_names)
             if contains(evs, 'exp') & ~contains(evs, 'FA') % tf pulse
                 start_ids = isbetween(t, [-.5 -.1]);
                 end_ids   = isbetween(t, [.7 1.2]);
-                all_iter_projs = detrend_resp(all_iter_projs, start_ids, end_ids);
+                all_iter_projs = utils.detrend_resp(all_iter_projs, start_ids, end_ids);
                 if ax_i < 3
                 all_iter_projs = all_iter_projs - nanmedian(all_iter_projs(:, isbetween(t, [-.5 0])),2);
                 end

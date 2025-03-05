@@ -1,4 +1,4 @@
-function proj = project_resps_onto_ax_nullSpace(resps, axes, mu, sd)
+function proj = project_resps_onto_ax(resps, axes, normalize)
 % 
 % Create {n_ax x n_resp_field} table containing responses to every event projected onto axes in
 % axes.
@@ -16,6 +16,11 @@ function proj = project_resps_onto_ax_nullSpace(resps, axes, mu, sd)
 
 ax_names = fields(axes)';
 proj = struct;
+resp_names = fields(resps);
+
+if nargin<3 | isempty(normalize)
+    normalize = true;
+end
 
 for ax_i = 1:length(ax_names)
     ax_name = ax_names{ax_i};
@@ -25,14 +30,26 @@ for ax_i = 1:length(ax_names)
             continue
         end
         this_resp = resps{:,r_i};
-        this_resp = (this_resp - mu) ./ sd;
+        
+        if normalize
+            this_resp = (this_resp - [resps.FRmu]) ./ [resps.FRsd]; 
+        end
+        
         this_resp(isnan(this_resp)) = 0;
         resp_name = resps.Properties.VariableNames{r_i};
         ax = axes.(ax_name)'/norm(axes.(ax_name)');
-%         ax = axes.(ax_name)';
+         
+        proj.(ax_name).(resp_name) = ax * this_resp;
         
-        proj.(ax_name).(resp_name) = smoothdata(ax * this_resp, 'movmean', 3*[5 0]);
+        if contains(resp_name, {'FexpF', 'FexpS', 'SexpF', 'SexpS', 'F', 'S'})
+            t = linspace(-.5, 1.5, 200);
+            proj.(ax_name).(resp_name) = utils.detrend_resp(proj.(ax_name).(resp_name), ...
+                                                      isbetween(t, [-.4 -.05]), ...
+                                                      isbetween(t, [.7 1.2]));
+        end
+        proj.(ax_name).(resp_name) = smoothdata(proj.(ax_name).(resp_name), 'movmean', [5 0]);
     end
+    
 
 end
 

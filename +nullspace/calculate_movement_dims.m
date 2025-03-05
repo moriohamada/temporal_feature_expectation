@@ -13,12 +13,11 @@ t_lick = isbetween(tax_repeated, [-.5 .5]);
 
 % opt 1 - lsr
 % Calculate the pseudo-inverse of N
-Ndr_shift = circshift(Ndr, 0, 2);
-N_pinv = pinv(Ndr_shift(:,t_lick));
-% N_pinv = pinv(Ndr(:,t_lick));
+Ndr_shift = circshift(Ndr, -3, 2); 
+N_pinv = pinv(Ndr(:,t_lick));
 % 
 % % Compute W using the pseudo-inverse of N
-W = Mdr(:,t_lick) * N_pinv
+W = Mdr(:,t_lick) * N_pinv;
 
 %% opt 2 - lasso
 

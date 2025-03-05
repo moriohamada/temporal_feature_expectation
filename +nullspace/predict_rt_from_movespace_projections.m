@@ -1,14 +1,13 @@
 function [f_quant, f_traj] = predict_rt_from_movespace_projections(projs_iters_aligned, t_ax_resps, ops)
 %%
 % dims  = fields(projs_iters_aligned{1});
-dims = {'movement_potent', 'movement_null1', 'movement_null2', 'tf_fast', 'tf_slow'};
+dims = {'movement_potent', 'movement_null1', 'movement_null2', 'tf_fast', 'tf_slow', 'F_proj_null1', 'S_proj_null1'};
 nIter = length(projs_iters_aligned);
 
 proj_mag = nan(numel(dims), 2, 2, nIter); % F/S, short/long
 
 resp_ids = isbetween(t_ax_resps.ch, [-.5 0]);
-
-% tfs = [5 6 ; 2 3]; % works
+ 
 tfs = [5 6 7; 1 2 3]; 
 % all changes works
 rts = {'short', 'long'};
@@ -39,13 +38,9 @@ for dd = 1:length(dims)
     subplot(1,length(dims),dd)
     hold on
     for tfi = 1:height(tfs) % fast, slow
-        diffs = squeeze(proj_mag(dd, tfi, 1, :) - proj_mag(dd, tfi, 2, :));
-%         violinPlot(diffs, 'showMM', 0,  'xValues', tfi+.6, ...
-%               'color',mat2cell(cols(tfi,:), 1), 'histopt', 1, 'histori', 'right', 'divFactor', 1 );
+        diffs = squeeze(proj_mag(dd, tfi, 1, :) - proj_mag(dd, tfi, 2, :)); 
         
-        
-        % scatter individual points
-        % scatter individual points
+         % scatter individual points
         if tfi==2
             rand_x = tfi+.35+rand(nIter,1)*.3;
         else
@@ -65,7 +60,7 @@ for dd = 1:length(dims)
 %     ylim([-1 1])
     yl = ylim; ylim([-1, 1].*max(abs(yl)));
     xlim([0.5 3]); xl = xlim;
-    set(gca, 'ycolor', 'none', 'xcolor', 'none')
+%     set(gca, 'ycolor', 'none', 'xcolor', 'none')
     plot(xl, [0 0], '-k', 'linewidth', .5);
 %     title(dims{dd}, 'Interpreter', 'none');
 end
@@ -74,7 +69,7 @@ end
 %% visualization of trajectories
 % keyboard
 tfs = [5 6 7; 1 2 3];
-rts = {'short', 'med', 'long'};
+rts = {'short',  'long'};
 dims = {'movement_null1', 'movement_null2', 'movement_potent'};
 % dims = {'tf_fast', 'tf_slow', 'movement_potent'};
 
@@ -107,15 +102,15 @@ end
 f_traj = figure('Units', 'normalized', 'OuterPosition', [.3 .1 .18 .2]);
 subplot(1,2,1);
 % ch_cols = [ops.colors.F; ops.colors.F_light; ops.colors.S; ops.colors.S_light];
-ch_cols = flipud(RedGreyBlue(6));
-ch_cols(4:6,:) = flipud(ch_cols(4:6,:));
+ch_cols = flipud(RedGreyBlue(4));
+ch_cols(3:4,:) = flipud(ch_cols(3:4,:));
 subplot(1,2,1); hold on; % trajectories
 [~, chon_t] =  min(abs(t_ax_resps.ch(resp_ids))); %chon_t = start_t + 5;
 dt = mode(diff(t_ax_resps.ch));
 marker_ts = abs(t_ax_resps.ch(resp_ids)/.25 - round(t_ax_resps.ch(resp_ids)/.25)) < dt/5;
 
 for tfi = 1:height(tfs) % F, S
-    for rti = [1 3]% short, long
+    for rti = [1 2]% short, long
         plot3(squeeze(nanmean(proj_vecs(1, tfi, rti, :, :), 5)), ...
               squeeze(nanmean(proj_vecs(2, tfi, rti, :, :), 5)), ...
               squeeze(nanmean(proj_vecs(3, tfi, rti, :, :), 5)), ...
@@ -150,7 +145,7 @@ xl = xlim; yl = ylim; zl = zlim;
 subplot(1,2,2); hold on;
 ax_lims = [xl(2); yl(2); zl(1)];
 for tfi = 1:height(tfs) % F, S
-    for rti = [1 3]% short, long
+    for rti = [1 2]% short, long
             start_coords = zeros(3,1);
             start_errors = zeros(3,2);
             for dim = 1:3
