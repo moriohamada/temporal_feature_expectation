@@ -3,7 +3,7 @@ function xyz = get_cluster_CCF_coordinates(sp)
 cids = sp.cids;
 xyz  = nan(length(cids), 3);
 prN  = nan(length(cids), 1);
-parfor ii = 1:length(cids)
+for ii = 1:length(cids)
     cid   = cids(ii);
     probe = floor(cid/10000);
     ch    = sp.clu_locs([sp.clu_locs.cid]==cid).ch;
