@@ -4,6 +4,7 @@ function [t, tr_t, info] = get_times_of_events(trials, daq, ops, ev)
 % 
 % --------------------------------------------------------------------------------------------------
 
+[trials, daq] = utils.remove_excluded_trials(trials, daq);
 
 switch lower(ev)
     
@@ -15,8 +16,11 @@ switch lower(ev)
 
         for tr = 1:length(trials)
             
+            if ~trials(tr).keepTrial
+                continue
+            end
+            
             bl_on  = daq.frame_times_tr_corrected.time{tr}(1);
-%             bl_on  = daq.Baseline_ON.rise_t(tr);
             bl_off = daq.Baseline_ON.fall_t(tr);
             
             if bl_off - bl_on < ops.minTrialDur
@@ -30,12 +34,13 @@ switch lower(ev)
         end
             
     case {'tf', 'tf outlier'}
+        
         % info returned: tf value, licked
         [tfF, timesF, tr_timesF, lickedF] = ...
-            get_tf_outliers_time_amp(trials, daq, 2, .25, ops.tfOutlier, 1, ops.rmvTimeAround, [0 ops.rmvTimeAround]);
+            utils.get_tf_outliers_time_amp(trials, daq, 2, .25, ops.tfOutlier, 1, ops.rmvTimeAround, [0 ops.rmvTimeAround]);
         
         [tfS, timesS, tr_timesS, lickedS] = ...
-            get_tf_outliers_time_amp(trials, daq, 2, .25, ops.tfOutlier, -1, ops.rmvTimeAround, [0 ops.rmvTimeAround]);
+            utils.get_tf_outliers_time_amp(trials, daq, 2, .25, ops.tfOutlier, -1, ops.rmvTimeAround, [0 ops.rmvTimeAround]);
 
         tf = [tfF, tfS];
         licked = [lickedF, lickedS];
@@ -44,7 +49,8 @@ switch lower(ev)
         tr_t = [tr_timesF, tr_timesS];
         
     case 'fa'
-        % info returned: tr
+        
+        % info returned: time, tr_t, tr
         t = [];
         tr_t = [];
         info = [];
@@ -75,6 +81,7 @@ switch lower(ev)
         end
         
     case 'abort'
+        
         % info returned: tr
         t = [];
         tr_t = [];
@@ -94,6 +101,7 @@ switch lower(ev)
         
         
     case 'change'
+        
         % info returned: change magnitude, hit(1)/miss(0), E(1)/U(0); RT
         t = [];
         tr_t = [];
@@ -132,6 +140,7 @@ switch lower(ev)
         end
         
     case 'hit'
+        
         % info returned: change magnitude, E(1)/U(0); RT
         t = [];
         tr_t = [];
@@ -144,7 +153,7 @@ switch lower(ev)
           
             bl_on  = daq.Baseline_ON.rise_t(tr); % use baseline onset signal - likely similar delay to change
             ch_on  = daq.Change_ON.rise_t(tr);
-%             keyboard
+
             if isfield(daq, 'mouthOpening')
                 if daq.mouthOpening.delta_time_by_tr(tr) < .7
                     hit_t = daq.mouthOpening.lick_onset_by_tr(tr);
@@ -170,8 +179,6 @@ switch lower(ev)
             else
                 exp = 1;
             end
-            
-            
             
             info(end+1,:) = [trials(tr).changeTF-2, exp, rt, tr];
             

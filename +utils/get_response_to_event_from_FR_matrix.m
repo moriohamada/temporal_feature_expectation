@@ -13,6 +13,7 @@ event_wins = event_times + win';
 
 % expected number resps 
 exp_win = range(win)/mode(diff(t_ax));
+
 % for each event, get all neurons' firing rates
 for ee = 1:nEvents
 
@@ -20,8 +21,10 @@ for ee = 1:nEvents
     if abs(exp_win - sum(in_win)) > 1
         continue
     end
-%     keyboard
+    
     psth(:,ee,1:sum(in_win)) = X(:,in_win);
 end
+
 psth = psth(:,:,1:numel(ev_t_ax));
+
 end

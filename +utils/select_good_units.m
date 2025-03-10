@@ -1,7 +1,7 @@
 function good_units = select_good_units(sp, ops)
 
 
-stable_clu = find_stable_clusters(sp, ops);
+stable_clu = utils.find_stable_clusters(sp, ops);
 
 if ops.suOnly
     good_clu = sp.cids(sp.cgs==2 & stable_clu);
@@ -17,7 +17,7 @@ good_units.cgs       = sp.cgs(ismember(sp.cids, good_clu));
 % may already have processed to good_units - in this case getting location is simply
 if iscell(sp.clu_locs)
     cid_idx = find(ismember(sp.cids, good_units.cids));
-    good_units.clu_locs = sp.clu_locs{cid_idx};
+    good_units.clu_locs = sp.clu_locs(cid_idx);
 else
     try
         % get locations

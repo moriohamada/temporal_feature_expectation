@@ -30,7 +30,7 @@ for a = 1:length(db.animals)
                 else
                     cont = 'EFLS';
                 end
-                trials = apply_tr_removal(trials, ops);
+                trials = utils.apply_tr_removal(trials, ops);
                 sessions_all(ii,1).animal      = animal;
                 sessions_all(ii,1).session     = session;
                 sessions_all(ii,1).contingency = cont;
@@ -43,16 +43,17 @@ for a = 1:length(db.animals)
             [trials, exp_settings, daq, sp] = ...
                 loadVariables(session_file, 'trials', 'exp_settings', 'daq', 'sp');
 
-
+            sp = utils.remove_nonROI_units(sp);
+            
             % remove trials too near start of sess/when mouse not behaving
-            trials = apply_tr_removal(trials, ops);
+            trials = utils.apply_tr_removal(trials, ops);
 
             % select good units based on kilosort classification and stability
-            good_units = select_good_units(sp, ops);
+            good_units = utils.select_good_units(sp, ops);
         
             % Also convert to nN x nT matrix and save
             if ops.saveFRmatrix
-                [fr, t_ax] = spike_times_to_fr(sp, ops.spBinWidth);
+                [fr, t_ax] = utils.spike_times_to_fr(sp, ops.spBinWidth);
                 unit_info.cids = sort(sp.cids);
                 unit_info.locs = {sp.clu_locs.brain_region};
                 save(fullfile(ops.frDir, sprintf('%s_%s.mat', animal, session)), ...
@@ -61,7 +62,7 @@ for a = 1:length(db.animals)
             clear sp
             
             % trim daq struct and trials
-            daq    = remove_unnecessary_daq_fields(daq);
+            daq    = utils.remove_unnecessary_daq_fields(daq);
             
             % get contingency
             all_changes = [trials.changeTF];
@@ -87,6 +88,7 @@ for a = 1:length(db.animals)
             fprintf('\tloaded data for %s_%s (%d/%d)\n', animal, session, s, length(sessions));
 
         catch me
+            % keyboard
             fprintf('\terror: unable to load data for %s_%s\n', animal, session);
             
         end

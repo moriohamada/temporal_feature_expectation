@@ -1,4 +1,4 @@
-function X_detrended = detrend_resp(X, start_inds, end_inds)
+function X_detrended = detrend_resp(X, start_inds, end_inds, rmv_bl)
 %  remove linear baseline change
 
 X_start = nanmean(X(:,start_inds),2);
@@ -11,5 +11,13 @@ steps = 0:size(X,2)-1;
 X_trend = slope * steps; 
 
 X_detrended = X - X_trend;
+
+if nargin<=3
+    rmv_bl = 0;
+end
+
+if rmv_bl
+    X_detrended = X_detrended - nanmean(X(:, start_inds),2);
+end
 
 end

@@ -48,23 +48,28 @@ daq.frame_times_tr.delayed_frames_numb = daq.frame_times_tr.delayed_frames_numb(
 daq.frame_times_tr_corrected.time = daq.frame_times_tr_corrected.time(in_tr);
 daq.frame_times_tr_corrected.delayed_frames_numb = daq.frame_times_tr_corrected.delayed_frames_numb(in_tr);
 
+if isfield(daq, 'frame_times_tr_adj')
 daq.frame_times_tr_adj.time = daq.frame_times_tr_adj.time(in_tr);
 daq.frame_times_tr_adj.delayed_frames_numb = daq.frame_times_tr_adj.delayed_frames_numb(in_tr);
-
+end
 % rot encoders
 in_tr = any(daq.Rot_enc_A.rise_t' > tr_periods(:,1) & daq.Rot_enc_A.rise_t' < tr_periods(:,2), 1);
 daq.Rot_enc_A.rise_t = daq.Rot_enc_A.rise_t(in_tr);
+in_tr = any(daq.Rot_enc_A.fall_t' > tr_periods(:,1) & daq.Rot_enc_A.fall_t' < tr_periods(:,2), 1);
 daq.Rot_enc_A.fall_t = daq.Rot_enc_A.fall_t(in_tr);
-daq.Rot_enc_A.duration = daq.Rot_enc_A.duration(in_tr);
+% daq.Rot_enc_A.duration = daq.Rot_enc_A.duration(in_tr);
 
 in_tr = any(daq.Rot_enc_B.rise_t' > tr_periods(:,1) & daq.Rot_enc_B.rise_t' < tr_periods(:,2), 1);
 daq.Rot_enc_B.rise_t = daq.Rot_enc_B.rise_t(in_tr);
+in_tr = any(daq.Rot_enc_B.fall_t' > tr_periods(:,1) & daq.Rot_enc_B.fall_t' < tr_periods(:,2), 1);
 daq.Rot_enc_B.fall_t = daq.Rot_enc_B.fall_t(in_tr);
-daq.Rot_enc_B.duration = daq.Rot_enc_B.duration(in_tr);
+% daq.Rot_enc_B.duration = daq.Rot_enc_B.duration(in_tr);
 
 % mouth opening
+if isfield(daq, 'mouthOpening')
 daq.mouthOpening.delta_time_by_tr = daq.mouthOpening.delta_time_by_tr(~rmv_trial);
 daq.mouthOpening.lick_onset_by_tr = daq.mouthOpening.lick_onset_by_tr(~rmv_trial);
+end
 
 % trials
 trials = trials(~rmv_trial);

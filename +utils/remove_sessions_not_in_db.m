@@ -1,19 +1,28 @@
-function [sessions, trials_all, daq_all, sp_all] = ...
-                            select_sessions_in_db(sessions, trials_all, daq_all, sp_all, db)
+function [sessions_inc, trials_all_inc, daq_all_inc, sp_all_inc] = ...
+                remove_sessions_not_in_db(sessions, trials_all, daq_all, sp_all, db)
 
-in_db = zeros(length(sessions),1);
+sessions_inc = sessions;
+trials_all_inc = trials_all;
+daq_all_inc = daq_all;
+sp_all_inc = sp_all;
+
+to_rmv = [];
+
 for s = 1:length(sessions)
-    animal  = sessions(s).animal;
-    session = sessions(s).session;
-    animal_id = find(strcmp(db.animals, animal));
-    if ~isempty(animal_id)
-        sess_id = find(strcmp(db.sessions{animal_id}, session));
-        if ~isempty(sess_id)
-            in_db(s) = 1;
-        end
+    animal = sessions(s).animal;
+    sess   = sessions(s).session;
+
+    animal_id = strcmp(db.animals, animal);
+    db_sess = db.sessions{animal_id};
+
+    if ~any(strcmp(db_sess, sess))
+        to_rmv(end+1) = s;
     end
 end
 
-% keyboard
-                        
+sessions_inc(to_rmv) = [];
+trials_all_inc(to_rmv) = [];
+daq_all_inc(to_rmv) = [];
+sp_all_inc(to_rmv) = [];
+
 end

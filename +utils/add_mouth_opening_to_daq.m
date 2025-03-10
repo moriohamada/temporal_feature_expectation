@@ -7,7 +7,7 @@ for s = 1:length(daq_all)
     animal = sessions(s).animal;
     sess   = sessions(s).session;
     
-    mouth_opening_times_file = fullfile(strrep(ops.dataDir,'npx','videography'), 'lick_onsets', ...
+    mouth_opening_times_file = fullfile( strrep(ops.dataDir, 'session_data','lick_onsets'), ...
                                         sprintf('%s_%s.mat', animal, sess));
                                     
     if exist(mouth_opening_times_file, 'file')

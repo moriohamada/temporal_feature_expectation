@@ -11,6 +11,7 @@ for s = 1:length(sessions)
     if strcmp(session(1), 'h') % not recording session
         continue
     end
+    session = string(session);
     
     sp = sp_all{s};
     
@@ -18,19 +19,17 @@ for s = 1:length(sessions)
     locs = sp.clu_locs';
     cgs  = sp.cgs';
     nN = length(cids);
-    
-    sess_info = table(repelem(animal, nN, 1), repelem(string(session), nN, 1), repelem(cont, nN, 1), ...
+    try
+    sess_info = table(repelem(animal, nN, 1), repelem(session, nN, 1), repelem(cont, nN, 1), ...
                       cids, locs, cgs, ...
                       'VariableNames', {'animal', 'session', 'cont', 'cid', 'loc', 'cg'});
-                  
+    catch
+        keyboard
+    end
     if isempty(neuron_info)
         neuron_info = sess_info;
     else
-        try
         neuron_info = [neuron_info; sess_info];
-        catch 
-            keyboard
-        end
     end
 
 end

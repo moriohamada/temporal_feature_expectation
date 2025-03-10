@@ -59,6 +59,10 @@ licked = [];
 
 % keyboard
 for tr = 1:n_tr
+    
+    if ~trials(tr).keepTrial
+        continue
+    end
      
     baseline_tf_vec = trials(tr).baselineStimVec(1:3:end);
     
@@ -82,14 +86,10 @@ for tr = 1:n_tr
     end
     
     outliers = find(outliers); 
-    try
     this_tr_frames = daq.frame_times_tr_corrected.time{tr}(1:3:end);
-    catch
-    this_tr_frames = daq.frame_times_tr.time{tr}(1:3:end);
-    end
     baseline_end_t  = daq.Baseline_ON.fall_t(tr);
     
-    outliers(outliers > length(this_tr_frames)) = []; 
+    outliers(outliers > length(this_tr_frames)) = []; % remove 'frames' never shown
     
     if ~isempty(outliers)
         
@@ -146,7 +146,7 @@ for tr = 1:n_tr
         
         times(end+1:end+length(this_tr_times(~rmv))) = this_tr_times(~rmv);
         tr_times(end+1:end+length(this_tr_times(~rmv))) = this_tr_times_from_bl(~rmv);
-        amps(end+1:end+length(this_tr_amps(~rmv)))   = log2(this_tr_amps(~rmv)/bltf);
+        amps(end+1:end+length(this_tr_amps(~rmv)))   = this_tr_amps(~rmv) - bltf;
         licked(end+1:end+length(this_tr_licked(~rmv))) = this_tr_licked(~rmv);
                 
         

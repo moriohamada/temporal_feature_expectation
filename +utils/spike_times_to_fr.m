@@ -4,7 +4,7 @@ function [fr, t_ax] = spike_times_to_fr(sp, bin_width, t_ax)
 % 
 % --------------------------------------------------------------------------------------------------
 
-if ~exist('t_ax', 'var') | isempty(t_ax)
+if ~exist('t_ax', 'var') || isempty(t_ax)
     t_ax = min(sp.st):bin_width/1000:(max(sp.st)+5);
 end
 
