@@ -72,7 +72,7 @@ end
 %%
 % Further options for fitting
 glm_ops.nlambdas    = 10;
-glm_ops.kFold       = 5;
+glm_ops.kFold       = 10;
 glm_ops.maxit       = 1e4;
 glm_ops.thresh      = 1e-4;
 glm_ops.nlambdas    = 10;
@@ -187,82 +187,94 @@ for r = 1:length(regressors)
     regressor_dims{r} = dim_ids(r)+1:dim_ids(r+1);
 end
 
-%% Lesion regressors in sequence to test significance
-
+%% Lesion (circshift) regressors and refit with fixed lambda
 % Get full model coefficients
-beta_full = cvglmnetCoef(CVinfo, 'lambda_min');
+beta_full = cvglmnetCoef(CVinfo, 'lambda_min'); 
+best_lambda = CVinfo.lambda_min;
 
-% Define regressor groups to lesion
 lesion_groups = {
     'TFbl',      find(contains(regressors, 'TFbl'));
     'TFch',      find(contains(regressors, 'TFch'));
-    'AllTF',     find(contains(regressors, 'TF'));
     'PreLick',   find(contains(regressors, 'PreLick'));
     'Lick',      find(strcmp(regressors, 'Lick'));
     'baseline',  find(strcmp(regressors, 'baseline'));
+    'all',       find(contains(regressors, 'Lick')|contains(regressors, 'TF'));
 };
 
 n_folds = max(foldIDs);
 n_groups = size(lesion_groups, 1);
-dev_full_folds = zeros(n_folds, n_groups);
-dev_lesion_folds = zeros(n_folds, n_groups);
+n_perms = 20;
 lesion_results = struct();
+
+options_fixed = options;
+options_fixed.lambda = best_lambda;
 
 for g = 1:n_groups
     group_name = lesion_groups{g, 1};
     group_regs = lesion_groups{g, 2};
     
-    % Get column indices for these regressors
-    cols_to_zero = [];
+    cols_to_shuffle = [];
     for r = group_regs
-        cols_to_zero = [cols_to_zero, regressor_dims{r}];
+        cols_to_shuffle = [cols_to_shuffle, regressor_dims{r}];
     end
     
     % Find rows where any of these columns are non-zero
-    active_rows = any(dm.X(:, cols_to_zero) ~= 0, 2);
+    active_rows = any(dm.X(:, cols_to_shuffle) ~= 0, 2);
     
-    % Zero out those coefficients
-    beta_lesion = beta_full;
-    beta_lesion(cols_to_zero + 1) = 0;  % +1 because beta(1) is intercept
+    fprintf('Testing %s:...\n', group_name);
+    
+    corr_full_folds = zeros(n_folds, 1);
+    corr_shifted_folds = zeros(n_folds, n_perms);
     
     for f = 1:n_folds
-        % Test set AND active rows
-        test_idx = (foldIDs == f) & active_rows;
-        y_test = y(test_idx);
-        X_test = dm.X(test_idx, :);
+        test_idx = foldIDs == f;
+        test_idx_active = test_idx & active_rows;  % Only active periods in this fold
         
-        % Full model
-        mu_full = exp(beta_full(1) + X_test * beta_full(2:end));
-        dev_full_folds(f, g) = poisson_deviance(y_test, mu_full);
+        y_test = y(test_idx_active);
+        X_test = dm.X(test_idx_active, :);
         
-        % Lesioned model
-        mu_lesion = exp(beta_lesion(1) + X_test * beta_lesion(2:end));
-        dev_lesion_folds(f, g) = poisson_deviance(y_test, mu_lesion);
+        % Predict on UNSHIFTED test data
+        y_pred_full = glmnetPredict(CVinfo.glmnet_fit, X_test, best_lambda, 'response');
+        
+        % Smooth predictions and actual for correlation
+        y_test_smooth = smoothdata(y_test, 'movmean', glm_ops.smoothPred);
+        y_pred_full_smooth = smoothdata(y_pred_full, 'movmean', glm_ops.smoothPred);
+        corr_full_folds(f) = corr(y_test_smooth, y_pred_full_smooth);
+        
+        % Test with circular shifts
+        parfor p = 1:n_perms
+            X_test_shifted = X_test;
+            min_shift_bins = round(1 / glm_ops.tBin);  % 1 second minimum
+            shift = randi([min_shift_bins, size(X_test, 1) - min_shift_bins]);
+            X_test_shifted(:, cols_to_shuffle) = circshift(X_test(:, cols_to_shuffle), shift, 1);
+            
+            % Predict on SHIFTED test data
+            y_pred_shifted = glmnetPredict(CVinfo.glmnet_fit, X_test_shifted, best_lambda, 'response');
+            y_pred_shifted_smooth = smoothdata(y_pred_shifted, 'movmean', glm_ops.smoothPred);
+            corr_shifted_folds(f, p) = corr(y_test_smooth, y_pred_shifted_smooth);
+        end
     end
     
-    % Store results
-    lesion_results.(group_name).dev_full = sum(dev_full_folds(:, g));
-    lesion_results.(group_name).dev_lesion = sum(dev_lesion_folds(:, g));
-    lesion_results.(group_name).delta_dev = lesion_results.(group_name).dev_lesion - lesion_results.(group_name).dev_full;
-    lesion_results.(group_name).pct_increase = 100 * lesion_results.(group_name).delta_dev / lesion_results.(group_name).dev_full;
-    lesion_results.(group_name).n_active = sum(active_rows);
+    % Average correlation across permutations
+    mean_corr_shifted_per_fold = mean(corr_shifted_folds, 2);
     
+    % Paired t-test: is full correlation greater than shifted?
+    [~, p_value, ~, stats] = ttest(corr_full_folds, mean_corr_shifted_per_fold, 'Tail', 'right');
+    
+    % Store results
+    lesion_results.(group_name).corr_full_mean = mean(corr_full_folds);
+    lesion_results.(group_name).corr_shifted_mean = mean(mean_corr_shifted_per_fold);
+    lesion_results.(group_name).delta_corr = mean(corr_full_folds - mean_corr_shifted_per_fold);
+    lesion_results.(group_name).p = p_value;
+    lesion_results.(group_name).t_stat = stats.tstat;
+    lesion_results.(group_name).n_active = sum(full(active_rows));
+    
+    fprintf('\tcorr_full = %.4f, corr_shifted = %.4f, delta = %.4f, p = %.4f (n=%d)\n', ...
+        lesion_results.(group_name).corr_full_mean, ...
+        lesion_results.(group_name).corr_shifted_mean, ...
+        lesion_results.(group_name).delta_corr, p_value, ...
+        lesion_results.(group_name).n_active);
 end
-
-%% Paired t-tests
-fprintf('\n--- Statistical tests ---\n');
-ps = table('size', [n_groups, 2], 'variablenames', {'feature', 'p'}, 'variabletypes', {'string', 'double'});
-for g = 1:n_groups
-    group_name = lesion_groups{g, 1};
-    [~, p] = ttest(dev_lesion_folds(:,g), dev_full_folds(:,g), 'Tail', 'right');
-    delta = mean(dev_lesion_folds(:,g) - dev_full_folds(:,g));
-    lesion_results.(group_name).p = p;
-    fprintf('%s: delta_dev = %.2f, pct = %.2f%%, p = %.4f\n', ...
-        group_name, delta, lesion_results.(group_name).pct_increase, p);
-    ps(g,:) = {group_name, p};
-end
-
-
 %%
 f_kernels = glm.plot_glm_kernels(beta_full, regressors, regressor_dims, dspec, glm_ops, ...
                                  sprintf('%s %s, cid: %s', animal, session, cid));
@@ -282,11 +294,13 @@ save(fullfile(save_folder, sprintf('cid%s.mat',cid)), ...
      'glm_ops', 'options', ...
      'beta_full', 'regressors', 'regressor_dims', ...
      'xval_corrs', 'CVinfo', ...
-     'lesion_results', 'ps')
+     'lesion_results', 'dspec')
  
 saveas(f_kernels, fullfile(save_folder, 'kernel_plots', cid), 'png')
 
 fprintf('\n ---GLM fit and successfully saved! ---\n')
+
+close(f_kernels)
 end
 
 

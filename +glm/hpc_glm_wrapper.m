@@ -15,7 +15,6 @@ addpath(genpath('/nfs/nhome/live/morioh/Documents/MATLAB/final_pipeline'));
 end 
 
 ns = nCat*10 + (1:10);
-
 for n = ns
     try
         glm.fit_glm_main(n);

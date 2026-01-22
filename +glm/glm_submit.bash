@@ -5,7 +5,7 @@
 #SBATCH -p cpu
 #SBATCH -N 1
 #SBATCH -c 5
-#SBATCH -t 0-04:00
+#SBATCH -t 0-06:00
 #SBATCH --mem=32G
 #SBATCH --array=0-3225
 
