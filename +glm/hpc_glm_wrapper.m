@@ -20,6 +20,10 @@ for n = ns
         glm.fit_glm_main(n);
     catch me
         fprintf('!!! Errored !!!\n')
+        fprintf('Error message: %s\n', me.message);
+        fprintf('Error trace: \n');
+        disp(me.stack)
+
     end
     fprintf('\n')
 end

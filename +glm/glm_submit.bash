@@ -5,10 +5,13 @@
 #SBATCH -p cpu
 #SBATCH -N 1
 #SBATCH -c 5
-#SBATCH -t 0-06:00
-#SBATCH --mem=32G
+#SBATCH -t 0-08:00
+#SBATCH --mem=48G
 #SBATCH --array=0-3225
+#SBATCH --mail-type=FAIL        
+#SBATCH --mail-user=morio.hamada.19@ucl.ac.uk
 
-module load matlab/R2024b
-matlab -nosplash -nodesktop -r " hpc_glm_wrapper($SLURM_ARRAY_TASK_ID); exit;"
+cd /nfs/nhome/live/morioh/Documents/MATLAB/final_pipeline/
 
+module load matlab/R2022a
+matlab -nosplash -nodesktop -r "glm.hpc_glm_wrapper($SLURM_ARRAY_TASK_ID); exit;"

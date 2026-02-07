@@ -26,10 +26,10 @@ end
 
 if strcmp(name, 'earth')
 paths.dataDir = '/mnt/ceph/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/';
-paths.saveDir = '/mnt/ceph/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/';
+paths.saveDir = '/mnt/ceph/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/results';
 else
 paths.dataDir = '/ceph/mrsic_flogel/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/';
-paths.saveDir = '/ceph/mrsic_flogel/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/results';
+paths.saveDir = '/ceph/mrsic_flogel/public/projects/MoHa_20260120_SwitchChangeDetect_spForGLM/FS10ms_50msKernels';
 end
 
 
@@ -85,6 +85,7 @@ params.session = session;
 params.cid     = cid;
 features = glm.one_hot_changes(features); 
 features = glm.one_hot_outcomes(features);
+features = glm.add_stimON(features);
 features_n = glm.add_st_to_glm_features(features, trStarts, st, glm_ops);
 
 [expt, dspec] = glm.get_expt_dspec_for_glm(features_n, params, glm_ops);
@@ -165,7 +166,8 @@ for k = 1:glm_ops.kFold
 
     y_pred = glmnetPredict(CVinfo.glmnet_fit, this_fold_x, best_lambda, 'response');
     xval_corrs(k) = corr(smoothdata(this_fold_y,'movmean',glm_ops.smoothPred),...
-                         smoothdata(y_pred,'movmean',glm_ops.smoothPred));
+                         smoothdata(y_pred,'movmean',glm_ops.smoothPred), ...
+                         'Rows','complete');
 end
 fprintf('done.\n')
 
@@ -239,31 +241,31 @@ for g = 1:n_groups
         % Smooth predictions and actual for correlation
         y_test_smooth = smoothdata(y_test, 'movmean', glm_ops.smoothPred);
         y_pred_full_smooth = smoothdata(y_pred_full, 'movmean', glm_ops.smoothPred);
-        corr_full_folds(f) = corr(y_test_smooth, y_pred_full_smooth);
+        corr_full_folds(f) = corr(y_test_smooth, y_pred_full_smooth, 'rows','complete');
         
         % Test with circular shifts
         parfor p = 1:n_perms
             X_test_shifted = X_test;
-            min_shift_bins = round(1 / glm_ops.tBin);  % 1 second minimum
-            shift = randi([min_shift_bins, size(X_test, 1) - min_shift_bins]);
+            min_shift_bins = round(.5 / glm_ops.tBin);  % 1 second minimum
+            shift = randi([min_shift_bins, round(size(X_test, 1) - min_shift_bins)]);
             X_test_shifted(:, cols_to_shuffle) = circshift(X_test(:, cols_to_shuffle), shift, 1);
             
             % Predict on SHIFTED test data
             y_pred_shifted = glmnetPredict(CVinfo.glmnet_fit, X_test_shifted, best_lambda, 'response');
             y_pred_shifted_smooth = smoothdata(y_pred_shifted, 'movmean', glm_ops.smoothPred);
-            corr_shifted_folds(f, p) = corr(y_test_smooth, y_pred_shifted_smooth);
+            corr_shifted_folds(f, p) = corr(y_test_smooth, y_pred_shifted_smooth, 'rows','complete');
         end
     end
     
     % Average correlation across permutations
-    mean_corr_shifted_per_fold = mean(corr_shifted_folds, 2);
+    mean_corr_shifted_per_fold = nanmean(corr_shifted_folds, 2);
     
     % Paired t-test: is full correlation greater than shifted?
     [~, p_value, ~, stats] = ttest(corr_full_folds, mean_corr_shifted_per_fold, 'Tail', 'right');
     
     % Store results
-    lesion_results.(group_name).corr_full_mean = mean(corr_full_folds);
-    lesion_results.(group_name).corr_shifted_mean = mean(mean_corr_shifted_per_fold);
+    lesion_results.(group_name).corr_full_mean = nanmean(corr_full_folds);
+    lesion_results.(group_name).corr_shifted_mean = nanmean(mean_corr_shifted_per_fold);
     lesion_results.(group_name).delta_corr = mean(corr_full_folds - mean_corr_shifted_per_fold);
     lesion_results.(group_name).p = p_value;
     lesion_results.(group_name).t_stat = stats.tstat;

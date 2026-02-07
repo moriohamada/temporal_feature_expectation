@@ -24,7 +24,7 @@ for r = 1:length(regressors)
             expt = buildGLM.registerValue(expt, reg, reg);
         case {'TFbl', 'TFblXDir', 'TFbl_abs', 'time', 'TFblXtime', ...
               'TFbl_e', 'TFbl_l', 'TFbl_f', 'TFbl_s', 'TFbl_fe', 'TFbl_fl', 'TFbl_se', 'TFbl_sl', ...
-              'motionEnergy', 'speed'}
+              'motionEnergy', 'speed', 'BaselineStimOn', 'ChangeStimOn'}
             expt = buildGLM.registerContinuous(expt, reg, reg);
         case 'SpTrain'
             expt = buildGLM.registerSpikeTrain(expt, reg, reg);
@@ -93,7 +93,7 @@ end
 
 
 % TFbl
-bs = basisFactory.makeSmoothTemporalBasis('boxcar', round(1000/binSize), round(1000/binSize), binfun);
+bs = basisFactory.makeSmoothTemporalBasis('boxcar', round(1000/binSize), round(200/binSize), binfun);
 offset = round(0 / binSize);
 
 if ops.splitELtf && ~ops.splitFStf
@@ -129,5 +129,13 @@ if ops.includeRunSpeed
     offset = round(-500 / binSize);
     dspec = buildGLM.addCovariateRaw(dspec, 'speed', 'Running', bs, offset);
 end
+
+% BL and change stimulus on indicator
+bs = basisFactory.makeSmoothTemporalBasis('boxcar', 1, 1, binfun);
+offset = 0;
+dspec = buildGLM.addCovariateRaw(dspec, 'BaselineStimOn', 'baseline on', bs, offset);
+dspec = buildGLM.addCovariateRaw(dspec, 'ChangeStimOn', 'change on', bs, offset);
+
+
 
 end
