@@ -1,4 +1,4 @@
-Main analysis code and manuscript for temporal expectation project. 
+Analysis code to reproduce main figures in manuscript for temporal expectation project. 
 
 See /manuscript of latest manuscript version.
 
