@@ -1,6 +1,6 @@
 Analysis code to reproduce main figures in manuscript for temporal expectation project. 
 
-See /manuscript of latest manuscript version.
+Latest manuscript version [here](https://github.com/moriohamada/temporal_feature_expectation/blob/main/manuscript/manuscript_hamada.pdf).
 
 analysis_pipeline.m is the main runner that calls other runners for different aspects of the analysis: 
 - behavioural_analyses:  runs through analysis of behavioural data. Functions in +behaviour.
