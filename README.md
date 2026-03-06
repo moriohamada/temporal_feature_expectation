@@ -1,4 +1,4 @@
-Analysis code to reproduce main figures in manuscript for temporal expectation project. 
+Analysis code to produce main figures in manuscript for temporal expectation project. Repo needs a cleanup...
 
 Latest manuscript version [here](https://github.com/moriohamada/temporal_feature_expectation/blob/main/manuscript/manuscript_hamada.pdf).
 
