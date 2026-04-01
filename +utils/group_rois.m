@@ -13,13 +13,20 @@ rois{1,2} = {'VISp1','VISp2/3','VISp4', 'VISp5','VISp6a', 'VISp6b', ...
 %              'RSPv1', 'RSPv2/3', 'RSPv5', 'RSPv6a','RSPv6b' };
 
 % MOs/CP
-rois{2, 2} = {'CP', 'MOs1', 'MOs2/3', 'MOs5', 'MOs6a', 'MOs6b', ...
-              };
+rois{2, 2} = {'CP', 'MOs1', 'MOs2/3', 'MOs5', 'MOs6a', 'MOs6b'};
+
+% MOp (primary motor)
+rois{3, 2} = {'MOp1', 'MOp2/3', 'MOp5', 'MOp6a', 'MOp6b'};
+
+% PFC (prefrontal: PL, ILA, ACA, ORB, FRP)
+rois{4, 2} = {'PL1', 'PL2/3', 'PL5', 'PL6a', 'PL6b', ...
+              'ILA1', 'ILA2/3', 'ILA5', 'ILA6a', 'ILA6b', ...
+              'ACAd1', 'ACAd2/3', 'ACAd5', 'ACAd6a', 'ACAd6b', ...
+              'ACAv1', 'ACAv2/3', 'ACAv5', 'ACAv6a', 'ACAv6b', ...
+              'ORBl1', 'ORBl2/3', 'ORBl5', 'ORBl6a', 'ORBl6b', ...
+              'ORBm1', 'ORBm2/3', 'ORBm5', 'ORBm6a', 'ORBm6b', ...
+              'FRP1', 'FRP2/3', 'FRP5', 'FRP6a', 'FRP6b'};
 
 % roi names
-% rois(:, 1) = {'VIS', 'HVA', 'MOsCP'};
-
-            
-% roi names
-rois(:, 1) = {'VIS',  'MOsCP'};
+rois(:, 1) = {'VIS', 'MOsCP', 'MOp', 'PFC'};
 end

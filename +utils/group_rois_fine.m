@@ -21,12 +21,31 @@ rois{4,2} = {'VISa1', 'VISa2/3', 'VISa4', 'VISa5', 'VISa6a', 'VISa6b', ...
              'RSPagl1', 'RSPagl2/3', 'RSPagl5', 'RSPagl6a', 'RSPagl6b', ...
              'RSPd1', 'RSPd2/3', 'RSPd5', 'RSPd6a', 'RSPd6b', ...
              'RSPv1', 'RSPv2/3', 'RSPv5', 'RSPv6a', 'RSPv6b'};
-% MOs 
+% MOs
 rois{5,2} = { 'MOs1', 'MOs2/3', 'MOs5', 'MOs6a', 'MOs6b'};
 
 % Striatum
 rois{6,2} = { 'CP',  'STR'};
 
-rois(:, 1) = {'Visual thalamus', 'V1', 'Sensory thalamus', 'Higher Visual', 'MOs', 'Striatum'};
+% MOp (primary motor)
+rois{7,2} = { 'MOp1', 'MOp2/3', 'MOp5', 'MOp6a', 'MOp6b'};
+
+% PL/ILA (prelimbic / infralimbic)
+rois{8,2} = { 'PL1', 'PL2/3', 'PL5', 'PL6a', 'PL6b', ...
+              'ILA1', 'ILA2/3', 'ILA5', 'ILA6a', 'ILA6b'};
+
+% ACA (anterior cingulate)
+rois{9,2} = { 'ACAd1', 'ACAd2/3', 'ACAd5', 'ACAd6a', 'ACAd6b', ...
+              'ACAv1', 'ACAv2/3', 'ACAv5', 'ACAv6a', 'ACAv6b'};
+
+% ORB (orbital cortex)
+rois{10,2} = { 'ORBl1', 'ORBl2/3', 'ORBl5', 'ORBl6a', 'ORBl6b', ...
+               'ORBm1', 'ORBm2/3', 'ORBm5', 'ORBm6a', 'ORBm6b'};
+
+% FRP (frontal pole)
+rois{11,2} = { 'FRP1', 'FRP2/3', 'FRP5', 'FRP6a', 'FRP6b'};
+
+rois(:, 1) = {'Visual thalamus', 'V1', 'Sensory thalamus', 'Higher Visual', 'MOs', 'Striatum', ...
+              'MOp', 'PL/ILA', 'ACA', 'ORB', 'FRP'};
             
 end

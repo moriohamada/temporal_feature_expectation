@@ -1,6 +1,7 @@
 function single_unit_responses_basic_wrapper(sessions, trials_all, daq_all, sp_all, ops)
 % 
 % run basic visualisations of single unit PSTHs
+% (takes a while - leave to run)
 % 
 % --------------------------------------------------------------------
 

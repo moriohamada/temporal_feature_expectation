@@ -17,10 +17,7 @@ m = length(p_values);
 % Initialize adjusted p-values array
 adjusted_p = zeros(size(sorted_p));
 
-% Apply sequential correction:
-% - First p-value (most significant) is kept as is (or multiplied by 1)
-% - Second p-value is multiplied by 2
-% - Third p-value is multiplied by 3, and so on
+% Apply sequential correction: 
 for i = 1:m
     adjusted_p(i) = sorted_p(i) * i;
 end

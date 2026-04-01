@@ -85,7 +85,6 @@ neural.calculate_unit_preferences(sessions, sp_all, ops)
 % neural.calculate_adaptive_tf_index(sessions, sp_all, ops) % to do: integrate into main preference calc
 
 
-
 %% Load averaged responses and indexes
 
 if exist(fullfile(ops.respsIndsDir, 'indexes_resps.mat'), 'file')

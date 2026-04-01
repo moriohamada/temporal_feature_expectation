@@ -148,9 +148,7 @@ for tr = 1:n_tr
         tr_times(end+1:end+length(this_tr_times(~rmv))) = this_tr_times_from_bl(~rmv);
         amps(end+1:end+length(this_tr_amps(~rmv)))   = this_tr_amps(~rmv) - bltf;
         licked(end+1:end+length(this_tr_licked(~rmv))) = this_tr_licked(~rmv);
-                
-        
-        
+       
     end
     
 end

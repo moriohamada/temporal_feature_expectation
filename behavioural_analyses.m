@@ -15,7 +15,6 @@ a_idx = 0;
 s_idx = 0;
 last_animal = '';
  
-
 for s = 1:n_sess
    animal  = sessions(s).animal;
    if ~strcmp(last_animal, animal)
@@ -104,7 +103,6 @@ save(fullfile(ops.dataDir, 'flip_times.mat'), 'flip_time')
 
 %% Calculate multi-pulse lick probabilities (Figure 2)
 
-
 for a = 1:length(animals)
     
     % get sessions corresponding to animal
@@ -120,7 +118,7 @@ for a = 1:length(animals)
     if strcmp(conts{a,1}, 'ESLF')
         tfs = -tfs;
     end
-    % 
+
      
     [p_lick_singlePulse{a}, p_lick_2pulse{a}, bins] = ...
                 behaviour.calculate_multi_pulse_lick_probability(tfs, stim_time, licked, [ops.ignoreTrStart inf], ops);

@@ -5,7 +5,6 @@ function expectation_analyses(avg_resps, t_ax, indexes, ops)
 % --------------------------------------------------------------------------------------------------
 if ~exist(fullfile(ops.saveDir, 'expectation')), mkdir(fullfile(ops.saveDir, 'expectation')); end
 
- 
 %% Visualize responses
 
 expectation.plot_average_resps_by_tf_pref(avg_resps, t_ax, indexes, ops);
@@ -37,28 +36,4 @@ expectation.quantify_gain_symmetry(avg_resps, t_ax, indexes, ops)
 tdr.visualize_responses_2d()
 
 end
-
-%% old
-% outliers:
-
-% slow pref, active early: tf_pref = -.642409, neuron id = 10207
-% slow pref, active late:  tf_pref = -700882, neuron id = 15291
-
-% fast, active late: tf pref =  0.1840, id: 15344
-% fast, acitve early: tf_pref = 0.4766, id: 14705  / .2722
-
-% expectation.plot_average_resps_by_tf_pref(avg_resps([15344 15344],:), t_ax, indexes([15344 15344],:), ops);
-
-%% adaptive - new
-% slow/late: 15291
-% expectation.plot_average_resps_by_tf_pref(avg_resps([15291 15291],:), t_ax, indexes([15291 15291],:), ops);
-% fast/late: 30156
-% expectation.plot_average_resps_by_tf_pref(avg_resps([30156 30156],:), t_ax, indexes([30156 30156],:), ops);
-
-%%
-% expectation.plot_average_resps_by_tf_pref(avg_resps([686 686],:), t_ax, indexes([686 686],:), ops);
-
-
-
-
-
+ 

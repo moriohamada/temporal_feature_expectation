@@ -150,7 +150,6 @@ switch lower(ev)
             if ~strcmp(trials(tr).trialOutcome, 'Hit')
                 continue
             end
-          
             bl_on  = daq.Baseline_ON.rise_t(tr); % use baseline onset signal - likely similar delay to change
             ch_on  = daq.Change_ON.rise_t(tr);
 

@@ -14,7 +14,6 @@ for n = 1:numRows
         val = val(1);
     else
         % Handle case when findpeaks doesn't find any peaks
-        % (e.g., monotonic data or single point)
         [val, maxIdx] = max(absRow);
         peakTimes(n) = maxIdx(1);
     end

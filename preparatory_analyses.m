@@ -38,7 +38,7 @@ ev_groups = { {'FexpF', 'FexpS', 'SexpF', 'SexpS'}, [ops.colors.F; ops.colors.F*
              {'hitLickE1', 'hitLickE2', 'hitLickE3', 'hitLickE4', 'hitLickE5', 'hitLickE6', 'hitLickE7'}, RedGreyBlue(7), [-2 1]};           
 % dim_names = {'movement_potent', 'movement_null1', 'movement_null2', 'tf_fast', 'tf_slow', 'tf_none'};
 dim_names = {'movement_potent', 'movement_null1', 'movement_null2'};
-% dim_names = {'tf_fast', 'tf_slow', 'tf_none'};
+
 
 [projs_iters_aligned, dims_iters_aligned] = nullspace.align_projection_directions_from_dims(projs_iters, dims_iters);
 % add tf F and S
